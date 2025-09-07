@@ -7,11 +7,11 @@ import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict, Type
 from enum import Enum
 
-from .base_parser import BaseParser, XMLUtils, SectionTypeMapper
-from .models import SPLSection, SectionType, ManufacturedProduct
-from .clinical_section_parser import ClinicalSectionParser
-from .product_parser import ProductParser
-from .ingredient_parser import IngredientParser
+from base_parser import BaseParser, XMLUtils, SectionTypeMapper
+from models import SPLSection, SectionType, ManufacturedProduct
+from clinical_section_parser import ClinicalSectionParser
+from product_parser import ProductParser
+from ingredient_parser import IngredientParser
 
 
 class ParsingStrategy(Enum):
@@ -78,15 +78,15 @@ class SectionParser(BaseParser):
     def _parse_basic_section(self, section_element: ET.Element) -> Optional[SPLSection]:
         """Parse basic section information."""
         # Extract section ID
-        id_element = XMLUtils.find_element(section_element, "id")
-        section_id = XMLUtils.get_attribute(id_element, "root") if id_element else ""
+        id_element = XMLUtils.find_element(section_element, "hl7:id")
+        section_id = XMLUtils.get_attribute(id_element, "root") if id_element is not None else ""
         
         if not section_id:
             self.add_error("Section missing required ID")
             return None
         
         # Extract section code and determine type
-        code_element = XMLUtils.find_element(section_element, "code")
+        code_element = XMLUtils.find_element(section_element, "hl7:code")
         section_code = XMLUtils.parse_coded_concept(code_element) if code_element else None
         
         section_type = None
@@ -94,11 +94,11 @@ class SectionParser(BaseParser):
             section_type = SectionTypeMapper.get_section_type(section_code.code)
         
         # Extract basic metadata
-        title_element = XMLUtils.find_element(section_element, "title")
+        title_element = XMLUtils.find_element(section_element, "hl7:title")
         title = XMLUtils.get_text_content(title_element) if title_element else None
         
-        effective_time_element = XMLUtils.find_element(section_element, "effectiveTime")
-        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element else None
+        effective_time_element = XMLUtils.find_element(section_element, "hl7:effectiveTime")
+        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element is not None else None
         
         return SPLSection(
             section_id=section_id,
@@ -122,7 +122,7 @@ class SectionParser(BaseParser):
     def _parse_product_listing_section(self, section_element: ET.Element, section: SPLSection) -> SPLSection:
         """Parse SPL listing sections containing product information."""
         # Look for subject elements containing manufactured products
-        subject_elements = XMLUtils.find_all_elements(section_element, "subject")
+        subject_elements = XMLUtils.find_all_elements(section_element, "hl7:subject")
         
         for subject_element in subject_elements:
             try:
@@ -136,9 +136,9 @@ class SectionParser(BaseParser):
                 self.add_error(f"Failed to parse manufactured product: {str(e)}")
         
         # Also parse any clinical text content
-        text_element = XMLUtils.find_element(section_element, "text")
+        text_element = XMLUtils.find_element(section_element, "hl7:text")
         if text_element is not None:
-            from .base_parser import TextExtractor
+            from base_parser import TextExtractor
             section.text_content = TextExtractor.extract_section_text(text_element)
         
         return section
@@ -149,7 +149,7 @@ class SectionParser(BaseParser):
         section = self.clinical_parser.parse_clinical_section(section_element, section)
         
         # Look for any product information that might contain ingredients
-        subject_elements = XMLUtils.find_all_elements(section_element, "subject")
+        subject_elements = XMLUtils.find_all_elements(section_element, "hl7:subject")
         for subject_element in subject_elements:
             manufactured_product = self.product_parser.parse(subject_element)
             if manufactured_product:
@@ -161,20 +161,20 @@ class SectionParser(BaseParser):
     
     def _parse_generic_section(self, section_element: ET.Element, section: SPLSection) -> SPLSection:
         """Parse generic sections with basic text extraction."""
-        text_element = XMLUtils.find_element(section_element, "text")
+        text_element = XMLUtils.find_element(section_element, "hl7:text")
         if text_element is not None:
-            from .base_parser import TextExtractor
+            from base_parser import TextExtractor
             section.text_content = TextExtractor.extract_section_text(text_element)
         
         return section
     
     def _parse_product_ingredients(self, subject_element: ET.Element) -> List:
         """Parse ingredients from a subject element containing manufactured product."""
-        manufactured_product_element = XMLUtils.find_element(subject_element, "manufacturedProduct")
+        manufactured_product_element = XMLUtils.find_element(subject_element, "hl7:manufacturedProduct")
         if manufactured_product_element is None:
             return []
         
-        inner_product = XMLUtils.find_element(manufactured_product_element, "manufacturedProduct")
+        inner_product = XMLUtils.find_element(manufactured_product_element, "hl7:manufacturedProduct")
         if inner_product is None:
             return []
         
@@ -184,9 +184,9 @@ class SectionParser(BaseParser):
         """Parse subsections recursively."""
         subsections = []
         
-        component_elements = XMLUtils.find_all_elements(section_element, "component")
+        component_elements = XMLUtils.find_all_elements(section_element, "hl7:component")
         for component in component_elements:
-            subsection_element = XMLUtils.find_element(component, "section")
+            subsection_element = XMLUtils.find_element(component, "hl7:section")
             if subsection_element is not None:
                 subsection = self.parse_section_enhanced(subsection_element)
                 if subsection:

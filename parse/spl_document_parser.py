@@ -7,10 +7,11 @@ import xml.etree.ElementTree as ET
 from typing import Optional, List, Union
 from datetime import datetime
 import logging
+import importlib
 
-from .base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
-from .models import SPLDocument, CodedConcept, SPLSection, SectionType
-from .validators import SPLDocumentValidator
+from base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
+from models import SPLDocument, CodedConcept, SPLSection, SectionType
+from validators import SPLDocumentValidator
 
 
 class SPLDocumentParser(BaseParser):
@@ -58,7 +59,7 @@ class SPLDocumentParser(BaseParser):
             document.processed_at = datetime.now()
             
             # Parse author information
-            author_element = XMLUtils.find_element(root, "author")
+            author_element = XMLUtils.find_element(root, "hl7:author")
             if author_element is not None:
                 document.author = self.author_parser.parse(author_element)
             
@@ -94,7 +95,7 @@ class SPLDocumentParser(BaseParser):
         # Check for required document elements
         required_elements = ["id", "code", "setId", "versionNumber"]
         for element_name in required_elements:
-            if XMLUtils.find_element(root, element_name) is None:
+            if XMLUtils.find_element(root, f"hl7:{element_name}") is None:
                 return False
         
         return True
@@ -102,36 +103,36 @@ class SPLDocumentParser(BaseParser):
     def _extract_document_metadata(self, root: ET.Element) -> SPLDocument:
         """Extract core document metadata from XML."""
         # Extract document ID
-        id_element = XMLUtils.find_element(root, "id")
-        document_id = XMLUtils.get_attribute(id_element, "root") if id_element else ""
+        id_element = XMLUtils.find_element(root, "hl7:id")
+        document_id = XMLUtils.get_attribute(id_element, "root") if id_element is not None else ""
         
         if not document_id:
             self.add_error("Document ID is missing or empty")
             document_id = "unknown"
         
         # Extract set ID
-        set_id_element = XMLUtils.find_element(root, "setId")
-        set_id = XMLUtils.get_attribute(set_id_element, "root") if set_id_element else ""
+        set_id_element = XMLUtils.find_element(root, "hl7:setId")
+        set_id = XMLUtils.get_attribute(set_id_element, "root") if set_id_element is not None else ""
         
         if not set_id:
             self.add_error("Set ID is missing or empty")
             set_id = document_id  # Fallback to document ID
         
         # Extract version number
-        version_element = XMLUtils.find_element(root, "versionNumber")
-        version_number = XMLUtils.get_attribute(version_element, "value") if version_element else ""
+        version_element = XMLUtils.find_element(root, "hl7:versionNumber")
+        version_number = XMLUtils.get_attribute(version_element, "value") if version_element is not None else ""
         
         if not version_number:
             self.add_error("Version number is missing or empty")
             version_number = "1"  # Default version
         
         # Extract effective time
-        effective_time_element = XMLUtils.find_element(root, "effectiveTime")
-        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element else None
+        effective_time_element = XMLUtils.find_element(root, "hl7:effectiveTime")
+        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element is not None else None
         
         # Extract document code
-        code_element = XMLUtils.find_element(root, "code")
-        document_code = XMLUtils.parse_coded_concept(code_element) if code_element else None
+        code_element = XMLUtils.find_element(root, "hl7:code")
+        document_code = XMLUtils.parse_coded_concept(code_element) if code_element is not None else None
         
         # Create SPL document
         document = SPLDocument(
@@ -149,21 +150,21 @@ class SPLDocumentParser(BaseParser):
         sections = []
         
         # Find the structured body
-        component = XMLUtils.find_element(root, "component")
+        component = XMLUtils.find_element(root, "hl7:component")
         if component is None:
             self.add_error("Document component is missing")
             return sections
         
-        structured_body = XMLUtils.find_element(component, "structuredBody")
+        structured_body = XMLUtils.find_element(component, "hl7:structuredBody")
         if structured_body is None:
             self.add_error("Structured body is missing")
             return sections
         
         # Parse all section components
-        section_components = XMLUtils.find_all_elements(structured_body, "component")
+        section_components = XMLUtils.find_all_elements(structured_body, "hl7:component")
         
         for component in section_components:
-            section_element = XMLUtils.find_element(component, "section")
+            section_element = XMLUtils.find_element(component, "hl7:section")
             if section_element is not None:
                 try:
                     section = self._parse_section(section_element)
@@ -178,36 +179,36 @@ class SPLDocumentParser(BaseParser):
     def _parse_section(self, section_element: ET.Element) -> Optional[SPLSection]:
         """Parse a single section element."""
         # Extract section ID
-        id_element = XMLUtils.find_element(section_element, "id")
-        section_id = XMLUtils.get_attribute(id_element, "root") if id_element else ""
+        id_element = XMLUtils.find_element(section_element, "hl7:id")
+        section_id = XMLUtils.get_attribute(id_element, "root") if id_element is not None else ""
         
         if not section_id:
             self.add_error("Section missing required ID")
             return None
         
         # Extract section code
-        code_element = XMLUtils.find_element(section_element, "code")
-        section_code = XMLUtils.parse_coded_concept(code_element) if code_element else None
+        code_element = XMLUtils.find_element(section_element, "hl7:code")
+        section_code = XMLUtils.parse_coded_concept(code_element) if code_element is not None else None
         
         # Determine section type from LOINC code
         section_type = None
         if section_code and section_code.code:
-            from .base_parser import SectionTypeMapper
+            from base_parser import SectionTypeMapper
             section_type = SectionTypeMapper.get_section_type(section_code.code)
         
         # Extract title
-        title_element = XMLUtils.find_element(section_element, "title")
-        title = XMLUtils.get_text_content(title_element) if title_element else None
+        title_element = XMLUtils.find_element(section_element, "hl7:title")
+        title = XMLUtils.get_text_content(title_element) if title_element is not None else None
         
         # Extract effective time
-        effective_time_element = XMLUtils.find_element(section_element, "effectiveTime")
-        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element else None
+        effective_time_element = XMLUtils.find_element(section_element, "hl7:effectiveTime")
+        effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element is not None else None
         
         # Extract text content
-        text_element = XMLUtils.find_element(section_element, "text")
+        text_element = XMLUtils.find_element(section_element, "hl7:text")
         text_content = None
         if text_element is not None:
-            from .base_parser import TextExtractor
+            from base_parser import TextExtractor
             text_content = TextExtractor.extract_section_text(text_element)
         
         # Create section object
@@ -221,9 +222,9 @@ class SPLDocumentParser(BaseParser):
         )
         
         # Parse subsections recursively
-        subsection_components = XMLUtils.find_all_elements(section_element, "component")
+        subsection_components = XMLUtils.find_all_elements(section_element, "hl7:component")
         for sub_component in subsection_components:
-            subsection_element = XMLUtils.find_element(sub_component, "section")
+            subsection_element = XMLUtils.find_element(sub_component, "hl7:section")
             if subsection_element is not None:
                 subsection = self._parse_section(subsection_element)
                 if subsection:

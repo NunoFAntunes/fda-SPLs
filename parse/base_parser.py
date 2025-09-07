@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 import logging
 from datetime import datetime
 
-from .models import (
+from models import (
     SPLDocument, SPLSection, CodedConcept, Organization, 
     DocumentAuthor, SectionType, IngredientType
 )
@@ -29,7 +29,7 @@ class SPLNamespaces:
     def get_namespaces(cls) -> Dict[str, str]:
         """Return namespace dictionary for XML parsing."""
         return {
-            "": cls.HL7_V3,
+            "hl7": cls.HL7_V3,
             "xsi": cls.XSI
         }
 
@@ -54,6 +54,9 @@ class XMLUtils:
     @staticmethod
     def get_attribute(element: ET.Element, attr_name: str) -> Optional[str]:
         """Get attribute value from element."""
+        if element is None:
+            return None
+        
         return element.get(attr_name)
     
     @staticmethod
@@ -107,8 +110,8 @@ class OrganizationParser(BaseParser):
     
     def parse(self, org_element: ET.Element) -> Organization:
         """Parse organization from XML element."""
-        id_element = XMLUtils.find_element(org_element, "id")
-        name_element = XMLUtils.find_element(org_element, "name")
+        id_element = XMLUtils.find_element(org_element, "hl7:id")
+        name_element = XMLUtils.find_element(org_element, "hl7:name")
         
         organization = Organization()
         
@@ -130,13 +133,13 @@ class DocumentAuthorParser(BaseParser):
         author = DocumentAuthor()
         
         # Parse time
-        time_element = XMLUtils.find_element(author_element, "time")
+        time_element = XMLUtils.find_element(author_element, "hl7:time")
         if time_element is not None:
             author.time = XMLUtils.get_attribute(time_element, "value")
         
         # Parse organizations
         org_parser = OrganizationParser()
-        assigned_entity = XMLUtils.find_element(author_element, "assignedEntity")
+        assigned_entity = XMLUtils.find_element(author_element, "hl7:assignedEntity")
         
         if assigned_entity is not None:
             # Parse all organization levels (can be nested)
@@ -149,14 +152,14 @@ class DocumentAuthorParser(BaseParser):
         organizations = []
         
         # Look for representedOrganization
-        repr_org = XMLUtils.find_element(element, "representedOrganization")
+        repr_org = XMLUtils.find_element(element, "hl7:representedOrganization")
         if repr_org is not None:
             organizations.append(org_parser.parse(repr_org))
             
             # Look for nested assignedEntity elements
-            nested_entities = XMLUtils.find_all_elements(repr_org, "assignedEntity")
+            nested_entities = XMLUtils.find_all_elements(repr_org, "hl7:assignedEntity")
             for nested_entity in nested_entities:
-                nested_orgs = XMLUtils.find_all_elements(nested_entity, "assignedOrganization")
+                nested_orgs = XMLUtils.find_all_elements(nested_entity, "hl7:assignedOrganization")
                 for nested_org in nested_orgs:
                     organizations.append(org_parser.parse(nested_org))
         
@@ -230,7 +233,7 @@ class TextExtractor:
     @staticmethod
     def _extract_list_text(list_element: ET.Element, text_parts: List[str]) -> None:
         """Extract text from list elements."""
-        items = XMLUtils.find_all_elements(list_element, "item")
+        items = XMLUtils.find_all_elements(list_element, "hl7:item")
         for item in items:
             text_parts.append("• ")
             TextExtractor._extract_text_recursive(item, text_parts)

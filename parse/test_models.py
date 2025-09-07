@@ -119,13 +119,13 @@ def test_xml_utils():
     root = ET.fromstring(xml_string)
     
     # Test finding elements
-    id_element = XMLUtils.find_element(root, "id")
+    id_element = XMLUtils.find_element(root, "hl7:id")
     if id_element is not None:
         root_attr = XMLUtils.get_attribute(id_element, "root")
         print(f"[OK] Found ID element with root: {root_attr}")
     
     # Test parsing coded concept
-    code_element = XMLUtils.find_element(root, "code")
+    code_element = XMLUtils.find_element(root, "hl7:code")
     if code_element is not None:
         concept = XMLUtils.parse_coded_concept(code_element)
         print(f"[OK] Parsed CodedConcept: {concept.display_name}")

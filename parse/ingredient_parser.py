@@ -7,8 +7,8 @@ import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict, Set
 import re
 
-from .base_parser import BaseParser, XMLUtils
-from .models import Ingredient, CodedConcept, Quantity, IngredientType
+from base_parser import BaseParser, XMLUtils
+from models import Ingredient, CodedConcept, Quantity, IngredientType
 
 
 class IngredientParser(BaseParser):
@@ -30,7 +30,7 @@ class IngredientParser(BaseParser):
             List[Ingredient]: List of parsed ingredients (active and inactive)
         """
         ingredients = []
-        ingredient_elements = XMLUtils.find_all_elements(product_element, "ingredient")
+        ingredient_elements = XMLUtils.find_all_elements(product_element, "hl7:ingredient")
         
         for ingredient_element in ingredient_elements:
             try:
@@ -64,12 +64,12 @@ class IngredientParser(BaseParser):
         ingredient = Ingredient(type=ingredient_type)
         
         # Parse quantity (mainly for active ingredients)
-        quantity_element = XMLUtils.find_element(ingredient_element, "quantity")
+        quantity_element = XMLUtils.find_element(ingredient_element, "hl7:quantity")
         if quantity_element is not None:
             ingredient.quantity = self._parse_quantity(quantity_element)
         
         # Parse ingredient substance
-        substance_element = XMLUtils.find_element(ingredient_element, "ingredientSubstance")
+        substance_element = XMLUtils.find_element(ingredient_element, "hl7:ingredientSubstance")
         if substance_element is not None:
             ingredient.substance_code, ingredient.substance_name = self._parse_substance(substance_element)
             
@@ -100,11 +100,11 @@ class IngredientParser(BaseParser):
     def _parse_substance(self, substance_element: ET.Element) -> tuple[Optional[CodedConcept], Optional[str]]:
         """Parse substance code and name."""
         # Parse substance code (typically UNII)
-        code_element = XMLUtils.find_element(substance_element, "code")
+        code_element = XMLUtils.find_element(substance_element, "hl7:code")
         substance_code = XMLUtils.parse_coded_concept(code_element) if code_element else None
         
         # Parse substance name
-        name_element = XMLUtils.find_element(substance_element, "name")
+        name_element = XMLUtils.find_element(substance_element, "hl7:name")
         substance_name = XMLUtils.get_text_content(name_element) if name_element else None
         
         # Clean and normalize substance name
@@ -119,11 +119,11 @@ class IngredientParser(BaseParser):
     
     def _parse_active_moiety(self, substance_element: ET.Element) -> Optional[Ingredient]:
         """Parse active moiety information for active ingredients."""
-        moiety_element = XMLUtils.find_element(substance_element, "activeMoiety")
+        moiety_element = XMLUtils.find_element(substance_element, "hl7:activeMoiety")
         if moiety_element is None:
             return None
         
-        inner_moiety = XMLUtils.find_element(moiety_element, "activeMoiety")
+        inner_moiety = XMLUtils.find_element(moiety_element, "hl7:activeMoiety")
         if inner_moiety is None:
             return None
         
@@ -137,8 +137,8 @@ class IngredientParser(BaseParser):
     
     def _parse_quantity(self, quantity_element: ET.Element) -> Optional[Quantity]:
         """Parse ingredient quantity with numerator and denominator."""
-        numerator_element = XMLUtils.find_element(quantity_element, "numerator")
-        denominator_element = XMLUtils.find_element(quantity_element, "denominator")
+        numerator_element = XMLUtils.find_element(quantity_element, "hl7:numerator")
+        denominator_element = XMLUtils.find_element(quantity_element, "hl7:denominator")
         
         if numerator_element is None:
             self.add_error("Quantity missing numerator")

@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 import logging
 
-from .models import (
+from models import (
     SPLDocument, SPLSection, ManufacturedProduct, Ingredient, 
     CodedConcept, Quantity, Organization, SectionType, IngredientType
 )

@@ -15,9 +15,9 @@ import logging
 import threading
 from queue import Queue
 
-from .spl_document_parser import SPLDocumentParser, SPLParseResult, parse_spl_file
-from .parser_factory import ParserManager, PresetConfigurations
-from .models import SPLDocument
+from spl_document_parser import SPLDocumentParser, SPLParseResult, parse_spl_file
+from parser_factory import ParserManager, PresetConfigurations
+from models import SPLDocument
 
 
 @dataclass

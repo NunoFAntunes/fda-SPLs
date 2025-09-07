@@ -7,13 +7,13 @@ from typing import Dict, Type, Optional, Any, List
 from enum import Enum
 import logging
 
-from .base_parser import BaseParser
-from .spl_document_parser import SPLDocumentParser
-from .section_parser import SectionParser
-from .product_parser import ProductParser
-from .ingredient_parser import IngredientParser
-from .clinical_section_parser import ClinicalSectionParser
-from .models import SectionType
+from base_parser import BaseParser
+from spl_document_parser import SPLDocumentParser
+from section_parser import SectionParser
+from product_parser import ProductParser
+from ingredient_parser import IngredientParser
+from clinical_section_parser import ClinicalSectionParser
+from models import SectionType
 
 
 class ParserType(Enum):

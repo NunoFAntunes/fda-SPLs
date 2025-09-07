@@ -11,12 +11,12 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
 
-from .models import SPLDocument, SectionType
-from .spl_document_parser import SPLDocumentParser, SPLParseResult
-from .parser_factory import ParserManager, ParserConfiguration, PresetConfigurations
-from .batch_processor import BatchProcessor, BatchJob, BatchResult
-from .validators import SPLDocumentValidator, ValidationResult
-from .section_parser import SectionAnalyzer
+from models import SPLDocument, SectionType
+from spl_document_parser import SPLDocumentParser, SPLParseResult
+from parser_factory import ParserManager, ParserConfiguration, PresetConfigurations
+from batch_processor import BatchProcessor, BatchJob, BatchResult
+from validators import SPLDocumentValidator, ValidationResult
+from section_parser import SectionAnalyzer
 
 
 class PipelineStage(Enum):

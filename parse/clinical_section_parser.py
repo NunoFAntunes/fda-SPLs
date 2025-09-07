@@ -8,8 +8,8 @@ from typing import Optional, List, Dict, Any
 import re
 from html import unescape
 
-from .base_parser import BaseParser, XMLUtils, TextExtractor
-from .models import SPLSection, MediaReference, SectionType
+from base_parser import BaseParser, XMLUtils, TextExtractor
+from models import SPLSection, MediaReference, SectionType
 
 
 class ClinicalSectionParser(BaseParser):
@@ -35,7 +35,7 @@ class ClinicalSectionParser(BaseParser):
             SPLSection: Enhanced section with clinical content
         """
         # Parse text content with clinical-specific processing
-        text_element = XMLUtils.find_element(section_element, "text")
+        text_element = XMLUtils.find_element(section_element, "hl7:text")
         if text_element is not None:
             section.text_content = self._extract_clinical_text(text_element, section.section_type)
             section.media_references = self._extract_media_references(text_element)
@@ -288,10 +288,10 @@ class ClinicalSectionParser(BaseParser):
         media_refs = []
         
         # Find component/observationMedia elements
-        components = XMLUtils.find_all_elements(section_element, "component")
+        components = XMLUtils.find_all_elements(section_element, "hl7:component")
         
         for component in components:
-            obs_media = XMLUtils.find_element(component, "observationMedia")
+            obs_media = XMLUtils.find_element(component, "hl7:observationMedia")
             if obs_media is not None:
                 media_ref = self._parse_observation_media(obs_media)
                 if media_ref:
@@ -308,19 +308,19 @@ class ClinicalSectionParser(BaseParser):
             media_id = f"media_{self.media_counter}"
         
         # Extract description
-        text_element = XMLUtils.find_element(obs_media_element, "text")
+        text_element = XMLUtils.find_element(obs_media_element, "hl7:text")
         description = XMLUtils.get_text_content(text_element) if text_element else None
         
         # Extract value element with media reference
-        value_element = XMLUtils.find_element(obs_media_element, "value")
+        value_element = XMLUtils.find_element(obs_media_element, "hl7:value")
         if value_element is None:
             return None
         
         media_type = XMLUtils.get_attribute(value_element, "mediaType")
         
         # Extract reference
-        reference_element = XMLUtils.find_element(value_element, "reference")
-        reference_value = XMLUtils.get_attribute(reference_element, "value") if reference_element else None
+        reference_element = XMLUtils.find_element(value_element, "hl7:reference")
+        reference_value = XMLUtils.get_attribute(reference_element, "value") if reference_element is not None else None
         
         if not reference_value:
             return None
