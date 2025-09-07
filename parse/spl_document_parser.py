@@ -8,6 +8,8 @@ from typing import Optional, List, Union
 from datetime import datetime
 import logging
 import importlib
+import json
+from dataclasses import asdict
 
 from base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
 from models import SPLDocument, CodedConcept, SPLSection, SectionType
@@ -273,6 +275,25 @@ class SPLParseResult:
         status = "SUCCESS" if self.success else "FAILED"
         doc_id = self.document.document_id if self.document else "Unknown"
         return f"SPLParseResult({status}, doc_id={doc_id}, errors={len(self.errors)})"
+    
+    def to_json(self) -> str:
+        """
+        Convert the SPLParseResult to JSON string.
+        
+        Returns:
+            str: JSON representation of the parse result
+        """
+        def datetime_serializer(obj):
+            """Custom serializer for datetime objects."""
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+        
+        # Convert to dictionary using dataclasses.asdict
+        result_dict = asdict(self)
+        
+        # Convert to JSON string with custom datetime serializer
+        return json.dumps(result_dict, default=datetime_serializer, indent=2)
 
 
 def parse_spl_document(source: Union[str, ET.Element]) -> SPLParseResult:

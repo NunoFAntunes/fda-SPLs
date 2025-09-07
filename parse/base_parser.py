@@ -102,8 +102,8 @@ class XMLUtils:
         try:
             result = element.get(attr_name)
             # Only log if it's a section code attribute to avoid too much noise
-            if attr_name == "code" and result:
-                print(f"[DEBUG] get_attribute('{attr_name}') = '{result}'")
+            # if attr_name == "code" and result:
+            #     print(f"[DEBUG] get_attribute('{attr_name}') = '{result}'")
             return result
         except Exception as e:
             print(f"[DEBUG] get_attribute exception: {e}")
@@ -127,7 +127,7 @@ class XMLUtils:
         code_system = XMLUtils.get_attribute(element, "codeSystem") 
         display_name = XMLUtils.get_attribute(element, "displayName")
         
-        print(f"[DEBUG] parse_coded_concept: code='{code}', system='{code_system}', display='{display_name}'")
+        # print(f"[DEBUG] parse_coded_concept: code='{code}', system='{code_system}', display='{display_name}'")
         
         if code and code_system:
             return CodedConcept(

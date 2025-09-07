@@ -24,6 +24,14 @@ class NDCValidator:
         re.compile(r'^\d{6}-\d{3}-\d{2}$'),  # 6-3-2 format (less common)
     ]
     
+    # Partial NDC patterns (product-level, missing package code) - valid in SPL contexts
+    PARTIAL_NDC_PATTERNS = [
+        re.compile(r'^\d{4}-\d{4}$'),        # 4-4 format (product level)
+        re.compile(r'^\d{5}-\d{3}$'),        # 5-3 format (product level)
+        re.compile(r'^\d{5}-\d{4}$'),        # 5-4 format (product level) 
+        re.compile(r'^\d{6}-\d{3}$'),        # 6-3 format (product level)
+    ]
+    
     # Pattern for extracting NDC from text
     NDC_EXTRACTION_PATTERN = re.compile(r'\b(?:NDC[:\s]*)?(\d{4,6}[-\s]?\d{3,4}[-\s]?\d{1,2})\b', re.IGNORECASE)
     
@@ -55,21 +63,33 @@ class NDCValidator:
                 ndc_clean = ndc.replace('-', '')
                 return cls._validate_ndc_structure(ndc_clean)
         
+        # Check partial NDC patterns (valid in SPL contexts)
+        for pattern in cls.PARTIAL_NDC_PATTERNS:
+            if pattern.match(ndc):
+                # Partial NDCs are valid for product-level identification
+                return True
+        
         return False
     
     @classmethod
     def normalize_ndc(cls, ndc: str) -> Optional[str]:
         """
-        Normalize NDC to standard 10-digit format with hyphens.
+        Normalize NDC to standard format with hyphens.
         
         Args:
             ndc: NDC string in various formats
             
         Returns:
-            str: Normalized NDC in 5-4-1 format or None if invalid
+            str: Normalized NDC or None if invalid
         """
         if not cls.validate_ndc(ndc):
             return None
+        
+        # Check if it's a partial NDC first
+        for pattern in cls.PARTIAL_NDC_PATTERNS:
+            if pattern.match(ndc):
+                # Return partial NDC as-is (already properly formatted)
+                return ndc
         
         ndc_clean = cls._clean_ndc(ndc)
         

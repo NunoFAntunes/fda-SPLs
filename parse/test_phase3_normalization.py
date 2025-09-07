@@ -31,6 +31,7 @@ def get_test_spl_document():
         return None
     
     result = parse_spl_file(test_file)
+    print(result.document)
     return result.document if result.success else None
 
 
@@ -150,19 +151,20 @@ def test_date_normalizer():
             tests_run += 1
             normalized = normalizer.normalize_date(test_date)
             if normalized:
-                print(f"  Date format test: {test_date} → {normalized} [OK]")
+                print(f"  Date format test: {test_date} -> {normalized} [OK]")
                 tests_passed += 1
             else:
-                print(f"  Date format test: {test_date} → Failed [FAIL]")
+                print(f"  Date format test: {test_date} -> Failed [FAIL]")
         
-        # Test date extraction from text
+        # Test date extraction from text (using private method for testing)
         text_with_dates = "The study was conducted from 2024-01-15 to 2024-06-30 with follow-up on 20241201."
-        extracted_dates = normalizer.extract_dates_from_text(text_with_dates)
+        # Note: _extract_date_from_text is a private method that extracts the first date
+        extracted_date = normalizer._extract_date_from_text(text_with_dates)
         tests_run += 1
-        if extracted_dates:
+        if extracted_date:
             print(f"  Date extraction from text:")
             print(f"    Text: {text_with_dates}")
-            print(f"    Extracted: {extracted_dates}")
+            print(f"    First extracted date: {extracted_date}")
             print(f"    [OK] Date extraction successful")
             tests_passed += 1
         else:
@@ -205,7 +207,7 @@ def test_unit_normalizer():
                 unit = ingredient.quantity.numerator_unit
                 normalized = normalizer.normalize_unit(unit)
                 
-                print(f"  Ingredient unit: {unit} → {normalized}")
+                print(f"  Ingredient unit: {unit} -> {normalized}")
                 if normalized:
                     print(f"    [OK] Unit normalization successful")
                     tests_passed += 1
@@ -235,13 +237,13 @@ def test_unit_normalizer():
         for unit in test_units:
             tests_run += 1
             normalized = normalizer.normalize_unit(unit)
-            unit_info = normalizer.get_unit_info(unit)
+            unit_category = normalizer.get_unit_category(unit) or "unknown"
             
             if normalized:
-                print(f"    {unit} → {normalized} ({unit_info.category if unit_info else 'unknown'}) [OK]")
+                print(f"    {unit} -> {normalized} ({unit_category}) [OK]")
                 tests_passed += 1
             else:
-                print(f"    {unit} → Failed [FAIL]")
+                print(f"    {unit} -> Failed [FAIL]")
         
         # Test complex unit combinations
         complex_units = ["mg/mL", "mcg/kg", "units/mL", "mg per tablet"]
@@ -250,10 +252,10 @@ def test_unit_normalizer():
             tests_run += 1
             normalized = normalizer.normalize_unit(unit)
             if normalized:
-                print(f"    {unit} → {normalized} [OK]")
+                print(f"    {unit} -> {normalized} [OK]")
                 tests_passed += 1
             else:
-                print(f"    {unit} → Failed [FAIL]")
+                print(f"    {unit} -> Failed [FAIL]")
         
         success_rate = tests_passed / tests_run if tests_run > 0 else 0
         print(f"[OK] UnitNormalizer tests: {tests_passed}/{tests_run} passed ({success_rate*100:.1f}%)")
@@ -324,7 +326,7 @@ def test_ndc_validator():
             normalized = NDCValidator.normalize_ndc(ndc) if is_valid else None
             
             status = "[OK]" if is_valid else "[FAIL]"
-            print(f"    {ndc} → Valid: {is_valid}, Normalized: {normalized} {status}")
+            print(f"    {ndc} -> Valid: {is_valid}, Normalized: {normalized} {status}")
             
             # For valid NDCs, normalization should work
             if is_valid and normalized:
@@ -431,13 +433,13 @@ def test_normalization_integration():
             for ingredient in product.ingredients:
                 if ingredient.quantity and ingredient.quantity.numerator_unit:
                     normalized_unit = unit_normalizer.normalize_unit(ingredient.quantity.numerator_unit)
-                    unit_info = unit_normalizer.get_unit_info(ingredient.quantity.numerator_unit)
+                    unit_category = unit_normalizer.get_unit_category(ingredient.quantity.numerator_unit)
                     
                     normalized_product['ingredients_with_normalized_units'].append({
                         'substance_name': ingredient.substance_name,
                         'original_unit': ingredient.quantity.numerator_unit,
                         'normalized_unit': normalized_unit,
-                        'unit_category': unit_info.category if unit_info else None
+                        'unit_category': unit_category
                     })
             
             normalized_data['normalized_products'].append(normalized_product)

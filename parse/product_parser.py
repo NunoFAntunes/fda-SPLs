@@ -30,42 +30,33 @@ class ProductParser(BaseParser):
         Returns:
             ManufacturedProduct: Parsed product information or None if parsing fails
         """
-        print(f"[DEBUG] ProductParser: Starting to parse subject element")
         
         manufactured_product_element = XMLUtils.find_element(subject_element, "hl7:manufacturedProduct")
         if manufactured_product_element is None:
-            print(f"[DEBUG] ProductParser: No manufacturedProduct found in subject element")
             self.add_error("No manufacturedProduct found in subject element")
             return None
         
-        print(f"[DEBUG] ProductParser: Found outer manufacturedProduct element")
         
         # Get the inner manufacturedProduct element
         inner_product = XMLUtils.find_element(manufactured_product_element, "hl7:manufacturedProduct")
         if inner_product is None:
-            print(f"[DEBUG] ProductParser: No inner manufacturedProduct found")
             self.add_error("No inner manufacturedProduct found")
             return None
         
-        print(f"[DEBUG] ProductParser: Found inner manufacturedProduct element")
         
         product = ManufacturedProduct()
         
         # Extract product code (NDC)
         product.product_code = self._extract_product_code(inner_product)
-        print(f"[DEBUG] ProductParser: Product code: {product.product_code}")
         
         # Extract product name and suffix
         product.product_name, product.product_name_suffix = self._extract_product_name(inner_product)
-        print(f"[DEBUG] ProductParser: Product name: {product.product_name}, suffix: {product.product_name_suffix}")
         
         # Extract form code (dosage form)
         product.form_code = self._extract_form_code(inner_product)
-        print(f"[DEBUG] ProductParser: Form code: {product.form_code}")
         
         # Extract generic name
         product.generic_name = self._extract_generic_name(inner_product)
-        print(f"[DEBUG] ProductParser: Generic name: {product.generic_name}")
         
         # Extract ingredients (will be handled by ingredient parser)
         product.ingredients = []  # Placeholder - will be populated by ingredient parser
@@ -82,7 +73,6 @@ class ProductParser(BaseParser):
         # Extract routes of administration
         product.routes_of_administration = self._extract_routes(manufactured_product_element)
         
-        print(f"[DEBUG] ProductParser: Successfully created product")
         return product
     
     def _extract_product_code(self, product_element: ET.Element) -> Optional[CodedConcept]:

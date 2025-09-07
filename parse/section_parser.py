@@ -55,7 +55,7 @@ class SectionParser(BaseParser):
         
         # Determine parsing strategy
         strategy = self._get_parsing_strategy(section.section_type)
-        print(f"[DEBUG] Section {section.section_id} type: {section.section_type}, strategy: {strategy}")
+        # print(f"[DEBUG] Section {section.section_id} type: {section.section_type}, strategy: {strategy}")
         
         # Apply strategy-specific enhancements
         try:
@@ -87,11 +87,11 @@ class SectionParser(BaseParser):
             self.add_error("Section missing required ID")
             return None
         
-        print(f"[DEBUG] Parsing basic section: {section_id}")
+        # print(f"[DEBUG] Parsing basic section: {section_id}")
         
         # Extract section code and determine type
         code_element = XMLUtils.find_element(section_element, "hl7:code")
-        print(f"[DEBUG] Found code element: {code_element is not None}")
+        # print(f"[DEBUG] Found code element: {code_element is not None}")
         
         section_code = None
         section_type = None
@@ -103,7 +103,7 @@ class SectionParser(BaseParser):
                 code_system = code_element.get("codeSystem")
                 display_name = code_element.get("displayName")
                 
-                print(f"[DEBUG] Direct element access - code: '{code_value}', system: '{code_system}'")
+                #print(f"[DEBUG] Direct element access - code: '{code_value}', system: '{code_system}'")
                 
                 if code_value and code_system:
                     from models import CodedConcept
@@ -114,12 +114,12 @@ class SectionParser(BaseParser):
                     )
                     
                     section_type = SectionTypeMapper.get_section_type(code_value)
-                    print(f"[DEBUG] Section code: {code_value}, mapped to type: {section_type}")
+                    # print(f"[DEBUG] Section code: {code_value}, mapped to type: {section_type}")
                 
             except Exception as e:
                 print(f"[DEBUG] Exception parsing section code: {e}")
         
-        print(f"[DEBUG] Final parsed section code: {section_code}")
+        # print(f"[DEBUG] Final parsed section code: {section_code}")
         
         # Extract basic metadata
         title_element = XMLUtils.find_element(section_element, "hl7:title")
@@ -149,25 +149,25 @@ class SectionParser(BaseParser):
     
     def _parse_product_listing_section(self, section_element: ET.Element, section: SPLSection) -> SPLSection:
         """Parse SPL listing sections containing product information."""
-        print(f"[DEBUG] Parsing SPL listing section: {section.section_id}")
+        # print(f"[DEBUG] Parsing SPL listing section: {section.section_id}")
         
         # Look for subject elements containing manufactured products
         subject_elements = XMLUtils.find_all_elements(section_element, "hl7:subject")
-        print(f"[DEBUG] Found {len(subject_elements)} subject elements in SPL listing section")
+        # print(f"[DEBUG] Found {len(subject_elements)} subject elements in SPL listing section")
         
         for i, subject_element in enumerate(subject_elements):
-            print(f"[DEBUG] Processing subject {i+1}")
+            # print(f"[DEBUG] Processing subject {i+1}")
             try:
                 manufactured_product = self.product_parser.parse(subject_element)
                 if manufactured_product:
-                    print(f"[DEBUG] Successfully parsed manufactured product: {manufactured_product.product_name}")
+                    # print(f"[DEBUG] Successfully parsed manufactured product: {manufactured_product.product_name}")
                     
                     # Parse ingredients for this product
                     manufactured_product.ingredients = self._parse_product_ingredients(subject_element)
-                    print(f"[DEBUG] Found {len(manufactured_product.ingredients)} ingredients")
+                    # print(f"[DEBUG] Found {len(manufactured_product.ingredients)} ingredients")
                     
                     section.manufactured_product = manufactured_product
-                    print(f"[DEBUG] Attached manufactured product to section")
+                    # print(f"[DEBUG] Attached manufactured product to section")
                     break  # Usually only one product per section
                 else:
                     print(f"[DEBUG] Product parser returned None")

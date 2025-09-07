@@ -24,6 +24,11 @@ class DateNormalizer:
         '%b %d, %Y',        # Sep 1, 2024
         '%d %B %Y',         # 1 September 2024
         '%d %b %Y',         # 1 Sep 2024
+        # Enhanced: datetime formats
+        '%Y-%m-%dT%H:%M:%S',    # 2024-03-15T10:30:00 (ISO 8601 datetime)
+        '%Y%m%d%H%M%S',         # 20240315103000 (compact datetime)
+        '%Y-%m-%dT%H:%M:%S.%f', # 2024-03-15T10:30:00.123456 (with microseconds)
+        '%Y-%m-%d %H:%M:%S',    # 2024-03-15 10:30:00 (space separated)
     ]
     
     # Regex patterns for date extraction

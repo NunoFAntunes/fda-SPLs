@@ -113,12 +113,23 @@ class UnitNormalizer:
         'ug/ml': 'ug/mL',
         'ug/mL': 'ug/mL',
         'mg/kg': 'mg/kg',
+        'mcg/kg': 'ug/kg',        # Enhanced: microgram per kilogram
+        'ug/kg': 'ug/kg',
         'mg/day': 'mg/d',
         'mg/hr': 'mg/h',
         'units/ml': 'U/mL',
         'units/mL': 'U/mL',
         'iu/ml': '[IU]/mL',
         'iu/mL': '[IU]/mL',
+        # Enhanced: "per" syntax variations
+        'mg per tablet': 'mg/{tablet}',
+        'mcg per tablet': 'ug/{tablet}',
+        'mg per capsule': 'mg/{capsule}',
+        'mcg per capsule': 'ug/{capsule}',
+        'units per ml': 'U/mL',
+        'units per mL': 'U/mL',
+        'iu per ml': '[IU]/mL',
+        'iu per mL': '[IU]/mL',
     }
     
     # Regex patterns for unit extraction
