@@ -270,11 +270,218 @@ Validated SPLDocument object → Phase 3
 - Comprehensive error handling and recovery
 - Structured output formats (JSON, JSONL, CSV)
 
-**Phase 3: Data Normalization** ⏳ **PENDING**
+**Phase 3: Data Normalization & Knowledge Extraction** ⏳ **PENDING**
+
+Phase 3 will:
+  1. Take SPLDocument objects from Phase 2
+  2. Process the free text fields using NLP/LLM techniques
+  3. Produce enhanced NormalizedSPLDocument objects with structured knowledge
+  4. Output both original + normalized data for Phase 4 database insertion
+
 - Standardize dates to ISO-8601 format
 - Normalize dosage units to UCUM standard where possible
 - Clean and structure text content (remove XML markup, preserve formatting)
 - Validate NDC format and structure
+- **Extract structured knowledge from free text clinical sections**
+- **Convert adverse effects to ICD-10 codes with confidence scoring**
+- **Normalize drug interaction severity and mechanisms**
+- **Extract structured dosing regimens from free text**
+- **Identify patient populations and restrictions from text**
+
+### Phase 3 Detailed Implementation Plan
+
+**Critical Challenge: Free Text Processing & Knowledge Extraction**
+
+SPL documents contain extensive free text that requires intelligent processing to extract structured clinical knowledge. This phase transforms unstructured clinical narratives into queryable, standardized data.
+
+#### **3.1 Free Text Field Identification & Processing**
+
+**Primary Free Text Fields Requiring Processing:**
+- **Clinical Section Text** (`spl_sections.section_text`)
+  - Warnings and precautions narratives
+  - Indications and usage descriptions  
+  - Dosage and administration instructions
+  - Contraindications text
+  - Adverse reactions descriptions
+  - Drug interactions text
+  - Patient counseling information
+  - Clinical pharmacology descriptions
+
+**Secondary Free Text Fields:**
+- Package descriptions
+- Storage condition narratives  
+- Special handling instructions
+- Population-specific recommendations
+
+**Knowledge Extraction Targets:**
+1. **Adverse Effects → ICD-10 Mapping**
+2. **Dosing Regimens → Structured Dose/Frequency/Duration**
+3. **Patient Populations → Age/Condition/Restriction Categories**
+4. **Drug Interactions → Severity/Mechanism/Clinical Effect**
+5. **Contraindications → Condition/Population/Severity**
+6. **Warnings → Risk Level/Population/Clinical Context**
+
+#### **3.2 Adverse Effects to ICD-10 Conversion System**
+
+**Challenge:** Convert free text adverse effects like "nausea, dizziness, severe allergic reactions" into structured ICD-10 codes (e.g., R11.0, R42, T78.2).
+
+**Implementation Approaches:**
+
+**Approach A: Rule-Based + Medical Ontology** (`normalize/medical_coding/`)
+- Use UMLS (Unified Medical Language System) for concept mapping
+- Create symptom-to-ICD-10 lookup tables
+- Apply NLP preprocessing (tokenization, negation detection)
+- Components:
+  - `normalize/medical_coding/umls_mapper.py`
+  - `normalize/medical_coding/icd10_converter.py` 
+  - `normalize/medical_coding/medical_ontology.py`
+  - `data/medical_mappings/symptom_to_icd10.json`
+
+**Approach B: BERT/BioBERT + Classification** (`normalize/ml_models/`)
+- Fine-tune BioBERT on medical text → ICD-10 classification
+- Train on labeled pharmaceutical adverse event data
+- Components:
+  - `normalize/ml_models/biobert_classifier.py`
+  - `normalize/ml_models/adverse_event_classifier.py`
+  - `models/biobert_icd10_classifier.pkl`
+  - `normalize/ml_models/model_trainer.py`
+
+**Approach C: LLM-Based Extraction** (`normalize/llm_processors/`)
+- Use GPT-4/Claude with structured prompts for ICD-10 mapping
+- Implement confidence scoring and validation
+- Components:
+  - `normalize/llm_processors/gpt_icd10_mapper.py`
+  - `normalize/llm_processors/llm_medical_extractor.py`
+  - `normalize/llm_processors/confidence_validator.py`
+  - `prompts/medical_coding_prompts.json`
+
+**Approach D: Hybrid Pipeline** (Recommended)
+- Combine rule-based preprocessing + ML classification + LLM validation
+- Multi-stage confidence scoring
+- Human-in-the-loop for low-confidence mappings
+
+#### **3.3 Structured Knowledge Extraction Pipeline**
+
+**Component Architecture:**
+
+**3.3.1 Text Preprocessing** (`normalize/text_processors/`)
+```
+normalize/text_processors/
+├── clinical_text_cleaner.py      # Remove XML, normalize whitespace
+├── medical_tokenizer.py          # Medical-aware tokenization
+├── negation_detector.py          # Detect negative contexts
+├── section_segmenter.py          # Split into logical segments
+└── abbreviation_expander.py     # Expand medical abbreviations
+```
+
+**3.3.2 Knowledge Extractors** (`normalize/extractors/`)
+```
+normalize/extractors/
+├── adverse_effects_extractor.py    # Extract + map to ICD-10
+├── dosing_regimen_extractor.py     # Extract dose/frequency/duration
+├── drug_interaction_extractor.py   # Extract interactions + severity
+├── population_extractor.py         # Extract age/condition restrictions
+├── contraindication_extractor.py   # Extract contraindications
+└── warning_classifier.py           # Classify warning severity/type
+```
+
+**3.3.3 Medical Coding Services** (`normalize/medical_coding/`)
+```
+normalize/medical_coding/
+├── icd10_service.py              # ICD-10 mapping and validation
+├── rxnorm_service.py             # Drug name normalization
+├── ucum_service.py               # Unit standardization
+├── medical_concept_mapper.py     # General medical concept mapping
+└── confidence_scorer.py          # Score extraction confidence
+```
+
+**3.3.4 Data Normalizers** (`normalize/normalizers/`)
+```
+normalize/normalizers/
+├── date_normalizer.py            # ISO-8601 date standardization
+├── unit_normalizer.py            # UCUM unit conversion
+├── ndc_normalizer.py             # NDC format validation
+├── dose_normalizer.py            # Dosage standardization
+└── text_normalizer.py            # General text cleaning
+```
+
+#### **3.4 Implementation Technology Options**
+
+**Option 1: Open Source NLP Stack**
+- **spaCy + scispaCy** for biomedical NLP
+- **Hugging Face Transformers** (BioBERT, ClinicalBERT)
+- **UMLS Python API** for medical concept mapping
+- **Pros:** Free, customizable, good performance
+- **Cons:** Requires ML expertise, training data needed
+
+**Option 2: Commercial Medical NLP APIs**
+- **AWS Comprehend Medical** for medical entity extraction
+- **Google Healthcare Natural Language API**
+- **Microsoft Text Analytics for Health**
+- **Pros:** Production-ready, high accuracy
+- **Cons:** Cost, vendor lock-in, API limits
+
+**Option 3: LLM-Based Processing**
+- **GPT-4** with carefully crafted prompts
+- **Claude 3** for medical text understanding
+- **Local LLM** (Llama-3.1-70B-Instruct) for privacy
+- **Pros:** Very flexible, handles edge cases well
+- **Cons:** Cost, latency, hallucination risk
+
+**Option 4: Hybrid Approach** (Recommended)
+- **Phase 1:** Rule-based preprocessing and obvious cases
+- **Phase 2:** ML models for ambiguous cases  
+- **Phase 3:** LLM validation and quality assurance
+- **Phase 4:** Human review for low-confidence extractions
+
+#### **3.5 Quality Assurance & Validation**
+
+**Validation Pipeline** (`normalize/validation/`)
+```
+normalize/validation/
+├── extraction_validator.py       # Validate extracted knowledge
+├── icd10_validator.py            # Validate ICD-10 code assignments
+├── confidence_assessor.py        # Assess extraction confidence
+├── human_review_queue.py         # Queue low-confidence items
+└── quality_metrics.py            # Track extraction quality
+```
+
+**Quality Metrics:**
+- **Extraction Accuracy:** % of correctly extracted clinical facts
+- **ICD-10 Mapping Accuracy:** % of correct adverse effect mappings
+- **Coverage Rate:** % of free text successfully processed
+- **Confidence Scores:** Distribution of extraction confidence
+- **Human Review Rate:** % requiring manual validation
+
+#### **3.6 Integration with Existing Pipeline**
+
+**Enhanced Data Models** (Extend `parse/models.py`)
+- Add normalized/extracted fields to existing models
+- Include confidence scores and validation status
+- Support for multiple extraction approaches
+
+**Pipeline Integration** (Enhance `parse/extraction_pipeline.py`)
+- Add Phase 3 normalization stage after parsing
+- Batch processing of normalization tasks  
+- Integration with database loader for normalized data
+
+**Database Schema Updates** (Extend database schema)
+- Add normalized data fields to existing tables
+- Include extraction metadata (confidence, method used)
+- Support for human review workflow tracking
+
+#### **3.7 Success Metrics for Phase 3**
+
+**Technical Metrics:**
+- **ICD-10 Mapping Accuracy:** >85% for common adverse effects
+- **Dosing Extraction Accuracy:** >90% for standard regimens  
+- **Processing Coverage:** >95% of clinical text processed
+- **Processing Speed:** <5 seconds per document average
+
+**Clinical Metrics:**
+- **Clinical Reviewer Approval:** >90% of extractions approved
+- **Pharmacist Validation:** High-value clinical facts correctly extracted
+- **Downstream Utility:** Extracted data enables accurate clinical queries
 
 **Phase 4: Database Integration** ⏳ **PENDING**
 - Design PostgreSQL schema with JSONB fields for flexible section storage
