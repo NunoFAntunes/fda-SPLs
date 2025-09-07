@@ -59,7 +59,7 @@ class SPLDocumentParser(BaseParser):
             
             # Extract document metadata
             document = self._extract_document_metadata(root)
-            document.raw_xml = raw_xml
+            #document.raw_xml = raw_xml
             document.processed_at = datetime.now()
             
             # Parse author information
@@ -284,15 +284,27 @@ class SPLParseResult:
             str: JSON representation of the parse result
         """
         def datetime_serializer(obj):
-            """Custom serializer for datetime objects."""
+            """Custom serializer for datetime and other objects."""
             if isinstance(obj, datetime):
                 return obj.isoformat()
+            # Handle dataclass instances
+            if hasattr(obj, '__dataclass_fields__'):
+                return asdict(obj)
+            # Handle enum instances
+            if hasattr(obj, 'value'):
+                return obj.value
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
         
-        # Convert to dictionary using dataclasses.asdict
-        result_dict = asdict(self)
+        # Manually create dictionary since SPLParseResult is not a dataclass
+        result_dict = {
+            'document': self.document,
+            'success': self.success,
+            'errors': self.errors,
+            'parse_time': self.parse_time,
+            'timestamp': self.timestamp
+        }
         
-        # Convert to JSON string with custom datetime serializer
+        # Convert to JSON string with custom serializer
         return json.dumps(result_dict, default=datetime_serializer, indent=2)
 
 

@@ -25,13 +25,24 @@ from normalize.normalizers.ndc_validator import NDCValidator
 
 def get_test_spl_document():
     """Get a parsed SPL document for testing."""
-    test_file = r"C:\code\fda-SPLs\data\extracted\dm_spl_release_human_otc_part1\otc\20090901_11ddf219-8537-4a8f-b267-ef965159885e\11ddf219-8537-4a8f-b267-ef965159885e.xml"
+    test_file = r"C:\code\fda-SPLs\example.xml"
     
     if not os.path.exists(test_file):
         return None
     
     result = parse_spl_file(test_file)
-    print(result.document)
+    
+    # Save JSON file using the to_json method
+    if result.success and result.document:
+        try:
+            json_output_path = Path(test_file).parent / "parsed_document.json"
+            json_content = result.to_json()
+            with open(json_output_path, 'w', encoding='utf-8') as f:
+                f.write(json_content)
+            print(f"Saved JSON output to: {json_output_path}")
+        except Exception as e:
+            print(f"Warning: Failed to save JSON output: {str(e)}")
+    
     return result.document if result.success else None
 
 
