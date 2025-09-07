@@ -127,8 +127,6 @@ class SPLSection:
     """Represents a section within an SPL document."""
     section_id: str
     section_code: Optional[CodedConcept] = None
-    section_type: Optional[SectionType] = None
-    title: Optional[str] = None
     text_content: Optional[str] = None
     effective_time: Optional[str] = None
     manufactured_product: Optional[ManufacturedProduct] = None
@@ -171,7 +169,9 @@ class SPLDocument:
 
     def get_sections_by_type(self, section_type: SectionType) -> List[SPLSection]:
         """Get all sections of a specific type."""
-        return [section for section in self.sections if section.section_type == section_type]
+        target_code = section_type.value if isinstance(section_type, SectionType) else section_type
+        return [section for section in self.sections 
+                if section.section_code and section.section_code.code == target_code]
     
     def get_manufactured_products(self) -> List[ManufacturedProduct]:
         """Extract all manufactured products from the document."""

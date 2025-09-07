@@ -72,7 +72,7 @@ class IndicationMapper(BaseMapper):
         def search_sections(section_list):
             for section in section_list:
                 # Primary indication section (LOINC 34067-9)
-                if section.section_type == "34067-9":
+                if section.section_code and section.section_code.code == "34067-9":
                     indication_sections.append(section)
                 
                 # Also search subsections
@@ -166,7 +166,7 @@ class IndicationMapper(BaseMapper):
         # Look in other sections that might contain indication-like information
         for section in document.sections:
             # Skip sections we already processed
-            if section.section_type == "34067-9":
+            if section.section_code and section.section_code.code == "34067-9":
                 continue
             
             # Look for text that might indicate usage

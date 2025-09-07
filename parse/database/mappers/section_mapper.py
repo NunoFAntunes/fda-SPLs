@@ -99,11 +99,7 @@ class SectionMapper(BaseMapper):
     
     def _extract_loinc_code(self, section: SPLSection) -> Optional[str]:
         """Extract LOINC code from section."""
-        # Try section_type first (this is the mapped LOINC code)
-        if section.section_type:
-            return section.section_type
-        
-        # Fall back to section_code if available
+        # Use section_code for LOINC code extraction
         if section.section_code and section.section_code.code_system == "2.16.840.1.113883.6.1":
             return section.section_code.code
         

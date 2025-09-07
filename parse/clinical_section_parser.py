@@ -37,7 +37,13 @@ class ClinicalSectionParser(BaseParser):
         # Parse text content with clinical-specific processing
         text_element = XMLUtils.find_element(section_element, "hl7:text")
         if text_element is not None:
-            section.text_content = self._extract_clinical_text(text_element, section.section_type)
+            # Get section type from section code for formatting
+            section_type = None
+            if section.section_code and section.section_code.code:
+                from base_parser import SectionTypeMapper
+                section_type = SectionTypeMapper.get_section_type(section.section_code.code)
+            
+            section.text_content = self._extract_clinical_text(text_element, section_type)
             section.media_references = self._extract_media_references(text_element)
         
         # Parse observational media components

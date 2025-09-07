@@ -81,7 +81,7 @@ class MedicationMapper(BaseMapper):
         
         # Look for SPL Listing section (LOINC 48780-1) with manufactured product
         for section in document.sections:
-            if (section.section_type == "48780-1" and 
+            if (section.section_code and section.section_code.code == "48780-1" and 
                 section.manufactured_product is not None):
                 
                 product = section.manufactured_product
@@ -195,7 +195,7 @@ class MedicationMapper(BaseMapper):
         additional_data['section_summary'] = {
             'total_sections': len(document.sections),
             'sections_with_text': len([s for s in document.sections if s.text_content]),
-            'section_types': list(set(s.section_type for s in document.sections if s.section_type))
+            'section_types': list(set(s.section_code.code for s in document.sections if s.section_code and s.section_code.code))
         }
         
         return additional_data

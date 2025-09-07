@@ -43,7 +43,7 @@ class IngredientMapper(BaseMapper):
         
         # Look for SPL Listing sections (LOINC 48780-1) with manufactured products
         for section in document.sections:
-            if (section.section_type == "48780-1" and 
+            if (section.section_code and section.section_code.code == "48780-1" and 
                 section.manufactured_product is not None):
                 
                 product = section.manufactured_product

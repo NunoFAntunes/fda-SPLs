@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Type
 from enum import Enum
 
 from base_parser import BaseParser, XMLUtils, SectionTypeMapper
-from models import SPLSection, SectionType, ManufacturedProduct
+from models import SPLSection, SectionType, ManufacturedProduct, CodedConcept
 from clinical_section_parser import ClinicalSectionParser
 from product_parser import ProductParser
 from ingredient_parser import IngredientParser
@@ -54,8 +54,8 @@ class SectionParser(BaseParser):
             return None
         
         # Determine parsing strategy
-        strategy = self._get_parsing_strategy(section.section_type)
-        # print(f"[DEBUG] Section {section.section_id} type: {section.section_type}, strategy: {strategy}")
+        strategy = self._get_parsing_strategy(section.section_code)
+        # print(f"[DEBUG] Section {section.section_id} code: {section.section_code.code if section.section_code else None}, strategy: {strategy}")
         
         # Apply strategy-specific enhancements
         try:
@@ -94,7 +94,6 @@ class SectionParser(BaseParser):
         # print(f"[DEBUG] Found code element: {code_element is not None}")
         
         section_code = None
-        section_type = None
         
         if code_element is not None:
             try:
@@ -113,8 +112,7 @@ class SectionParser(BaseParser):
                         display_name=display_name
                     )
                     
-                    section_type = SectionTypeMapper.get_section_type(code_value)
-                    # print(f"[DEBUG] Section code: {code_value}, mapped to type: {section_type}")
+                    # print(f"[DEBUG] Section code: {code_value}")
                 
             except Exception as e:
                 print(f"[DEBUG] Exception parsing section code: {e}")
@@ -122,22 +120,22 @@ class SectionParser(BaseParser):
         # print(f"[DEBUG] Final parsed section code: {section_code}")
         
         # Extract basic metadata
-        title_element = XMLUtils.find_element(section_element, "hl7:title")
-        title = XMLUtils.get_text_content(title_element) if title_element else None
-        
         effective_time_element = XMLUtils.find_element(section_element, "hl7:effectiveTime")
         effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element is not None else None
         
         return SPLSection(
             section_id=section_id,
             section_code=section_code,
-            section_type=section_type,
-            title=title,
             effective_time=effective_time
         )
     
-    def _get_parsing_strategy(self, section_type: Optional[SectionType]) -> ParsingStrategy:
-        """Determine parsing strategy based on section type."""
+    def _get_parsing_strategy(self, section_code: Optional[CodedConcept]) -> ParsingStrategy:
+        """Determine parsing strategy based on section code."""
+        if not section_code or not section_code.code:
+            return ParsingStrategy.GENERIC
+        
+        # Convert LOINC code to SectionType for strategy mapping
+        section_type = SectionTypeMapper.get_section_type(section_code.code)
         if section_type is None:
             return ParsingStrategy.GENERIC
         
@@ -272,8 +270,8 @@ class SectionAnalyzer:
         product_sections = 0
         
         for section in sections:
-            # Count by section type
-            section_type_name = section.section_type.name if section.section_type else "UNKNOWN"
+            # Count by section code
+            section_type_name = section.section_code.code if section.section_code else "UNKNOWN"
             type_counts[section_type_name] = type_counts.get(section_type_name, 0) + 1
             
             # Count sections with text vs product data
@@ -302,8 +300,6 @@ class SectionAnalyzer:
             score += 1
         if section.section_code:
             score += 1
-        if section.section_type:
-            score += 1
         
         # Content
         if section.text_content and len(section.text_content.strip()) > 10:
@@ -318,7 +314,13 @@ class SectionAnalyzer:
     @staticmethod
     def identify_missing_sections(sections: List[SPLSection], document_type: str = "OTC") -> List[SectionType]:
         """Identify commonly expected sections that are missing."""
-        existing_types = {section.section_type for section in sections if section.section_type}
+        from base_parser import SectionTypeMapper
+        existing_types = set()
+        for section in sections:
+            if section.section_code and section.section_code.code:
+                section_type = SectionTypeMapper.get_section_type(section.section_code.code)
+                if section_type:
+                    existing_types.add(section_type)
         
         if document_type.upper() == "OTC":
             expected_sections = {

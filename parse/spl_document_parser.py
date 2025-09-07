@@ -204,16 +204,6 @@ class SPLDocumentParser(BaseParser):
         code_element = XMLUtils.find_element(section_element, "hl7:code")
         section_code = XMLUtils.parse_coded_concept(code_element) if code_element is not None else None
         
-        # Determine section type from LOINC code
-        section_type = None
-        if section_code and section_code.code:
-            from base_parser import SectionTypeMapper
-            section_type = SectionTypeMapper.get_section_type(section_code.code)
-        
-        # Extract title
-        title_element = XMLUtils.find_element(section_element, "hl7:title")
-        title = XMLUtils.get_text_content(title_element) if title_element is not None else None
-        
         # Extract effective time
         effective_time_element = XMLUtils.find_element(section_element, "hl7:effectiveTime")
         effective_time = XMLUtils.get_attribute(effective_time_element, "value") if effective_time_element is not None else None
@@ -229,8 +219,6 @@ class SPLDocumentParser(BaseParser):
         section = SPLSection(
             section_id=section_id,
             section_code=section_code,
-            section_type=section_type,
-            title=title,
             text_content=text_content,
             effective_time=effective_time
         )

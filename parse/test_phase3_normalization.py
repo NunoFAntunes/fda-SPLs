@@ -78,7 +78,7 @@ def test_text_cleaner():
             cleaned_text = TextCleaner.clean_clinical_text(original_text)
             plain_text = TextCleaner.extract_plain_text(original_text)
             
-            print(f"  Section {i+1} ({section.section_type}):")
+            print(f"  Section {i+1} ({section.section_code.code if section.section_code else 'Unknown'}):")
             print(f"    Original length: {len(original_text)}")
             print(f"    Cleaned length: {len(cleaned_text)}")
             print(f"    Plain text length: {len(plain_text)}")
@@ -409,7 +409,7 @@ def test_normalization_integration():
             if section.text_content:
                 normalized_section = {
                     'section_id': section.section_id,
-                    'section_type': section.section_type,
+                    'section_code': section.section_code.code if section.section_code else None,
                     'original_text_length': len(section.text_content),
                     'cleaned_text': TextCleaner.clean_clinical_text(section.text_content),
                     'plain_text': TextCleaner.extract_plain_text(section.text_content),

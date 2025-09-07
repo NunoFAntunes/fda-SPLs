@@ -304,7 +304,13 @@ class SPLDocumentValidator(BaseValidator):
         
         # Check for required section types in drug products
         required_sections = {SectionType.ACTIVE_INGREDIENT, SectionType.WARNINGS}
-        found_sections = {section.section_type for section in document.sections if section.section_type}
+        from base_parser import SectionTypeMapper
+        found_sections = set()
+        for section in document.sections:
+            if section.section_code and section.section_code.code:
+                section_type = SectionTypeMapper.get_section_type(section.section_code.code)
+                if section_type:
+                    found_sections.add(section_type)
         
         missing_sections = required_sections - found_sections
         if missing_sections:
