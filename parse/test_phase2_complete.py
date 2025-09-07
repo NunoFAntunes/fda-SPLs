@@ -58,7 +58,6 @@ def test_document_parser():
         print(f"[ERROR] Exception during parsing: {str(e)}")
         return False
 
-
 def test_section_analysis():
     """Test section analysis and enhancement."""
     print("\nTesting Section Analysis...")
