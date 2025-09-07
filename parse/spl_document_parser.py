@@ -11,10 +11,10 @@ import importlib
 import json
 from dataclasses import asdict
 
-from base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
-from models import SPLDocument, CodedConcept, SPLSection, SectionType
-from validators import SPLDocumentValidator
-from section_parser import SectionParser
+from .base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
+from .models import SPLDocument, CodedConcept, SPLSection, SectionType
+from .validators import SPLDocumentValidator
+from .section_parser import SectionParser
 
 
 class SPLDocumentParser(BaseParser):
