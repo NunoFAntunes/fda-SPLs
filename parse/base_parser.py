@@ -32,6 +32,15 @@ class SPLNamespaces:
             "hl7": cls.HL7_V3,
             "xsi": cls.XSI
         }
+    
+    @classmethod
+    def get_namespaces_with_default(cls) -> Dict[str, str]:
+        """Return namespace dictionary including default namespace for XML parsing."""
+        return {
+            "hl7": cls.HL7_V3,
+            "xsi": cls.XSI,
+            "": cls.HL7_V3  # Default namespace
+        }
 
 
 class XMLUtils:
@@ -39,17 +48,50 @@ class XMLUtils:
     
     @staticmethod
     def find_element(parent: ET.Element, tag: str, namespaces: Optional[Dict[str, str]] = None) -> Optional[ET.Element]:
-        """Find first child element with given tag."""
+        """Find first child element with given tag, handling both prefixed and default namespace elements."""
         if namespaces is None:
-            namespaces = SPLNamespaces.get_namespaces()
-        return parent.find(tag, namespaces)
+            namespaces = SPLNamespaces.get_namespaces_with_default()
+        
+        # If tag has hl7: prefix, try with explicit namespace
+        if tag.startswith("hl7:"):
+            unprefixed_tag = tag[4:]  # Remove "hl7:" prefix
+            # Try with explicit namespace first
+            result = parent.find(f"{{{SPLNamespaces.HL7_V3}}}{unprefixed_tag}")
+            if result is not None:
+                return result
+            
+            # Fallback: try with namespace prefix
+            result = parent.find(tag, namespaces)
+            if result is not None:
+                return result
+        else:
+            # For non-prefixed tags, try as-is first
+            result = parent.find(tag, namespaces)
+            if result is not None:
+                return result
+        
+        return None
     
     @staticmethod
     def find_all_elements(parent: ET.Element, tag: str, namespaces: Optional[Dict[str, str]] = None) -> List[ET.Element]:
-        """Find all child elements with given tag."""
+        """Find all child elements with given tag, handling both prefixed and default namespace elements."""
         if namespaces is None:
-            namespaces = SPLNamespaces.get_namespaces()
-        return parent.findall(tag, namespaces)
+            namespaces = SPLNamespaces.get_namespaces_with_default()
+        
+        # If tag has hl7: prefix, try with explicit namespace
+        if tag.startswith("hl7:"):
+            unprefixed_tag = tag[4:]  # Remove "hl7:" prefix
+            # Try with explicit namespace first
+            results = parent.findall(f"{{{SPLNamespaces.HL7_V3}}}{unprefixed_tag}")
+            if results:
+                return results
+            
+            # Fallback: try with namespace prefix
+            results = parent.findall(tag, namespaces)
+            return results
+        else:
+            # For non-prefixed tags, try as-is
+            return parent.findall(tag, namespaces)
     
     @staticmethod
     def get_attribute(element: ET.Element, attr_name: str) -> Optional[str]:
@@ -57,7 +99,15 @@ class XMLUtils:
         if element is None:
             return None
         
-        return element.get(attr_name)
+        try:
+            result = element.get(attr_name)
+            # Only log if it's a section code attribute to avoid too much noise
+            if attr_name == "code" and result:
+                print(f"[DEBUG] get_attribute('{attr_name}') = '{result}'")
+            return result
+        except Exception as e:
+            print(f"[DEBUG] get_attribute exception: {e}")
+            return None
     
     @staticmethod
     def get_text_content(element: ET.Element) -> Optional[str]:
@@ -69,9 +119,15 @@ class XMLUtils:
     @staticmethod
     def parse_coded_concept(element: ET.Element) -> Optional[CodedConcept]:
         """Parse a coded concept from XML element."""
+        if element is None:
+            print(f"[DEBUG] parse_coded_concept: element is None")
+            return None
+        
         code = XMLUtils.get_attribute(element, "code")
-        code_system = XMLUtils.get_attribute(element, "codeSystem")
+        code_system = XMLUtils.get_attribute(element, "codeSystem") 
         display_name = XMLUtils.get_attribute(element, "displayName")
+        
+        print(f"[DEBUG] parse_coded_concept: code='{code}', system='{code_system}', display='{display_name}'")
         
         if code and code_system:
             return CodedConcept(

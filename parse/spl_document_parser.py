@@ -12,6 +12,7 @@ import importlib
 from base_parser import BaseParser, XMLUtils, DocumentAuthorParser, ParseError
 from models import SPLDocument, CodedConcept, SPLSection, SectionType
 from validators import SPLDocumentValidator
+from section_parser import SectionParser
 
 
 class SPLDocumentParser(BaseParser):
@@ -24,6 +25,7 @@ class SPLDocumentParser(BaseParser):
         super().__init__()
         self.author_parser = DocumentAuthorParser()
         self.validator = SPLDocumentValidator()
+        self.section_parser = SectionParser()
     
     def parse(self, source: Union[str, ET.Element]) -> SPLDocument:
         """
@@ -177,7 +179,17 @@ class SPLDocumentParser(BaseParser):
         return sections
     
     def _parse_section(self, section_element: ET.Element) -> Optional[SPLSection]:
-        """Parse a single section element."""
+        """Parse a single section element using the enhanced section parser."""
+        try:
+            # Use the enhanced section parser for full parsing including products and ingredients
+            return self.section_parser.parse(section_element)
+        except Exception as e:
+            self.add_error(f"Enhanced section parsing failed: {str(e)}")
+            # Fallback to basic parsing if enhanced parsing fails
+            return self._parse_basic_section(section_element)
+    
+    def _parse_basic_section(self, section_element: ET.Element) -> Optional[SPLSection]:
+        """Parse a single section element with basic information only."""
         # Extract section ID
         id_element = XMLUtils.find_element(section_element, "hl7:id")
         section_id = XMLUtils.get_attribute(id_element, "root") if id_element is not None else ""

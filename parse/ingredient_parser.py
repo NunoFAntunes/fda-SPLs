@@ -19,6 +19,10 @@ class IngredientParser(BaseParser):
         self.substance_cache: Dict[str, str] = {}  # Cache for substance code to name mapping
         self.known_units = self._initialize_known_units()
     
+    def parse(self, source: ET.Element) -> List[Ingredient]:
+        """Required abstract method implementation - delegates to parse_ingredients."""
+        return self.parse_ingredients(source)
+    
     def parse_ingredients(self, product_element: ET.Element) -> List[Ingredient]:
         """
         Parse all ingredients from a manufactured product element.
@@ -29,18 +33,26 @@ class IngredientParser(BaseParser):
         Returns:
             List[Ingredient]: List of parsed ingredients (active and inactive)
         """
+        print(f"[DEBUG] IngredientParser: Starting to parse ingredients")
         ingredients = []
         ingredient_elements = XMLUtils.find_all_elements(product_element, "hl7:ingredient")
+        print(f"[DEBUG] IngredientParser: Found {len(ingredient_elements)} ingredient elements")
         
-        for ingredient_element in ingredient_elements:
+        for i, ingredient_element in enumerate(ingredient_elements):
+            print(f"[DEBUG] IngredientParser: Processing ingredient {i+1}")
             try:
                 ingredient = self.parse_single_ingredient(ingredient_element)
                 if ingredient:
+                    print(f"[DEBUG] IngredientParser: Successfully parsed ingredient: {ingredient.type.value} - {ingredient.substance_name}")
                     ingredients.append(ingredient)
+                else:
+                    print(f"[DEBUG] IngredientParser: Failed to parse ingredient {i+1}")
             except Exception as e:
+                print(f"[DEBUG] IngredientParser: Exception parsing ingredient {i+1}: {str(e)}")
                 self.add_error(f"Failed to parse ingredient: {str(e)}")
                 continue
         
+        print(f"[DEBUG] IngredientParser: Completed parsing, found {len(ingredients)} valid ingredients")
         return ingredients
     
     def parse_single_ingredient(self, ingredient_element: ET.Element) -> Optional[Ingredient]:
@@ -53,68 +65,118 @@ class IngredientParser(BaseParser):
         Returns:
             Ingredient: Parsed ingredient or None if parsing fails
         """
-        # Determine ingredient type from classCode attribute
-        class_code = XMLUtils.get_attribute(ingredient_element, "classCode")
+        print(f"[DEBUG] IngredientParser: Starting to parse single ingredient")
+        
+        # Determine ingredient type from classCode attribute - use direct access
+        try:
+            class_code = ingredient_element.get("classCode")
+            print(f"[DEBUG] IngredientParser: Got classCode directly: '{class_code}'")
+        except Exception as e:
+            print(f"[DEBUG] IngredientParser: Exception getting classCode: {e}")
+            class_code = None
+            
         ingredient_type = self._parse_ingredient_type(class_code)
         
         if ingredient_type is None:
+            print(f"[DEBUG] IngredientParser: Could not determine ingredient type")
             self.add_error(f"Unknown ingredient class code: {class_code}")
             return None
         
         ingredient = Ingredient(type=ingredient_type)
+        print(f"[DEBUG] IngredientParser: Created ingredient with type: {ingredient_type}")
         
         # Parse quantity (mainly for active ingredients)
-        quantity_element = XMLUtils.find_element(ingredient_element, "hl7:quantity")
-        if quantity_element is not None:
-            ingredient.quantity = self._parse_quantity(quantity_element)
+        try:
+            quantity_element = XMLUtils.find_element(ingredient_element, "hl7:quantity")
+            print(f"[DEBUG] IngredientParser: Found quantity element: {quantity_element is not None}")
+            if quantity_element is not None:
+                ingredient.quantity = self._parse_quantity(quantity_element)
+                print(f"[DEBUG] IngredientParser: Parsed quantity: {ingredient.quantity}")
+        except Exception as e:
+            print(f"[DEBUG] IngredientParser: Exception parsing quantity: {e}")
         
         # Parse ingredient substance
-        substance_element = XMLUtils.find_element(ingredient_element, "hl7:ingredientSubstance")
-        if substance_element is not None:
-            ingredient.substance_code, ingredient.substance_name = self._parse_substance(substance_element)
-            
-            # Parse active moiety if present
-            if ingredient_type == IngredientType.ACTIVE:
-                ingredient.active_moiety = self._parse_active_moiety(substance_element)
+        try:
+            substance_element = XMLUtils.find_element(ingredient_element, "hl7:ingredientSubstance")
+            print(f"[DEBUG] IngredientParser: Found substance element: {substance_element is not None}")
+            if substance_element is not None:
+                ingredient.substance_code, ingredient.substance_name = self._parse_substance(substance_element)
+                print(f"[DEBUG] IngredientParser: Parsed substance: {ingredient.substance_name}")
+                
+                # Parse active moiety if present
+                if ingredient_type == IngredientType.ACTIVE:
+                    ingredient.active_moiety = self._parse_active_moiety(substance_element)
+        except Exception as e:
+            print(f"[DEBUG] IngredientParser: Exception parsing substance: {e}")
         
         # Validate ingredient
         if not ingredient.substance_name and not ingredient.substance_code:
+            print(f"[DEBUG] IngredientParser: Ingredient validation failed - no substance info")
             self.add_error("Ingredient missing substance information")
             return None
         
+        print(f"[DEBUG] IngredientParser: Successfully parsed ingredient: {ingredient.substance_name}")
         return ingredient
     
     def _parse_ingredient_type(self, class_code: str) -> Optional[IngredientType]:
         """Parse ingredient type from class code."""
+        print(f"[DEBUG] IngredientParser: Parsing ingredient type from class_code: '{class_code}'")
         if not class_code:
+            print(f"[DEBUG] IngredientParser: class_code is empty")
             return None
         
         class_code = class_code.upper()
-        if class_code == "ACTIB":
+        if class_code == "ACTIM":
+            print(f"[DEBUG] IngredientParser: Recognized as ACTIVE ingredient")
             return IngredientType.ACTIVE
         elif class_code == "IACT":
+            print(f"[DEBUG] IngredientParser: Recognized as INACTIVE ingredient")
             return IngredientType.INACTIVE
         else:
+            print(f"[DEBUG] IngredientParser: Unknown class_code: '{class_code}'")
             return None
     
     def _parse_substance(self, substance_element: ET.Element) -> tuple[Optional[CodedConcept], Optional[str]]:
         """Parse substance code and name."""
-        # Parse substance code (typically UNII)
-        code_element = XMLUtils.find_element(substance_element, "hl7:code")
-        substance_code = XMLUtils.parse_coded_concept(code_element) if code_element else None
+        print(f"[DEBUG] IngredientParser: Starting to parse substance")
         
-        # Parse substance name
-        name_element = XMLUtils.find_element(substance_element, "hl7:name")
-        substance_name = XMLUtils.get_text_content(name_element) if name_element else None
+        # Parse substance code (typically UNII) - use direct access
+        substance_code = None
+        try:
+            code_element = substance_element.find("{urn:hl7-org:v3}code")
+            if code_element is not None:
+                code_value = code_element.get("code")
+                code_system = code_element.get("codeSystem")
+                if code_value and code_system:
+                    from models import CodedConcept
+                    substance_code = CodedConcept(
+                        code=code_value,
+                        code_system=code_system,
+                        display_name=None
+                    )
+                    print(f"[DEBUG] IngredientParser: Found substance code: {code_value}")
+        except Exception as e:
+            print(f"[DEBUG] IngredientParser: Exception parsing substance code: {e}")
         
-        # Clean and normalize substance name
-        if substance_name:
-            substance_name = self._normalize_substance_name(substance_name)
+        # Parse substance name - use direct access
+        substance_name = None
+        try:
+            name_element = substance_element.find("{urn:hl7-org:v3}name")
+            if name_element is not None and name_element.text:
+                substance_name = name_element.text.strip()
+                print(f"[DEBUG] IngredientParser: Found substance name: '{substance_name}'")
+                
+                # Clean and normalize substance name
+                substance_name = self._normalize_substance_name(substance_name)
+                print(f"[DEBUG] IngredientParser: Normalized substance name: '{substance_name}'")
+        except Exception as e:
+            print(f"[DEBUG] IngredientParser: Exception parsing substance name: {e}")
         
         # Cache substance information for future reference
         if substance_code and substance_name:
             self.substance_cache[substance_code.code] = substance_name
         
+        print(f"[DEBUG] IngredientParser: Returning substance_code: {substance_code}, substance_name: '{substance_name}'")
         return substance_code, substance_name
     
     def _parse_active_moiety(self, substance_element: ET.Element) -> Optional[Ingredient]:

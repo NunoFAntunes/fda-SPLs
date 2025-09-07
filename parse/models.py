@@ -28,7 +28,7 @@ class SectionType(Enum):
 
 class IngredientType(Enum):
     """Types of ingredients in pharmaceutical products."""
-    ACTIVE = "ACTIB"
+    ACTIVE = "ACTIM"
     INACTIVE = "IACT"
 
 
