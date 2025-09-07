@@ -338,16 +338,16 @@ def analyze_single_spl_file(file_path: str):
         pipeline = ExtractionPipeline(config)
         
         # Process single document
-        pipeline_result = pipeline.process_documents([file_path])
+        pipeline_result = pipeline.process_files([file_path])
         
         print(f"Pipeline processing complete!")
-        print(f"Success Rate: {pipeline_result.success_rate:.1%}")
-        print(f"Documents Processed: {pipeline_result.total_processed}")
-        print(f"Processing Time: {pipeline_result.total_processing_time:.2f}s")
+        print(f"Success Rate: {pipeline_result.metrics.success_rate:.1f}%")
+        print(f"Documents Processed: {pipeline_result.metrics.total_files}")
+        print(f"Processing Time: {pipeline_result.metrics.processing_time:.2f}s")
         
-        if pipeline_result.errors:
-            print(f"\nPipeline Errors ({len(pipeline_result.errors)}):")
-            for error in pipeline_result.errors:
+        if pipeline_result.processing_errors:
+            print(f"\nPipeline Errors ({len(pipeline_result.processing_errors)}):")
+            for error in pipeline_result.processing_errors:
                 print(f"  - {error}")
         
         print_separator("EXTRACTION VALIDATION", 2)
