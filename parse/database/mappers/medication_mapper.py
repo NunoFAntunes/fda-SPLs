@@ -79,48 +79,43 @@ class MedicationMapper(BaseMapper):
         """Extract product information from SPL document sections."""
         product_info = {}
         
-        # Look for SPL Listing section (LOINC 48780-1) with manufactured product
-        for section in document.sections:
-            if (section.section_code and section.section_code.code == "48780-1" and 
-                section.manufactured_product is not None):
-                
-                product = section.manufactured_product
-                
-                # Basic product information
-                product_info['brand_name'] = product.product_name
-                product_info['generic_name'] = product.generic_name
-                
-                # NDC code (primary product code)
-                if product.product_code and product.product_code.code_system == "2.16.840.1.113883.6.69":
-                    product_info['ndc_code'] = product.product_code.code
-                
-                # Product form
-                if product.form_code:
-                    product_info['product_form'] = product.form_code.display_name or product.form_code.code
-                
-                # Route of administration
-                if product.routes_of_administration:
-                    routes = [route.route_code.display_name or route.route_code.code 
-                             for route in product.routes_of_administration]
-                    product_info['route_of_administration'] = ', '.join(routes)
-                
-                # Marketing information
-                if product.marketing_info:
-                    product_info['marketing_status'] = product.marketing_info.status_code
-                    product_info['marketing_date_start'] = self._parse_date(
-                        product.marketing_info.effective_date_low
+        # Use document-level manufactured product
+        if document.manufactured_product is not None:
+            product = document.manufactured_product
+            
+            # Basic product information
+            product_info['brand_name'] = product.product_name
+            product_info['generic_name'] = product.generic_name
+            
+            # NDC code (primary product code)
+            if product.product_code and product.product_code.code_system == "2.16.840.1.113883.6.69":
+                product_info['ndc_code'] = product.product_code.code
+            
+            # Product form
+            if product.form_code:
+                product_info['product_form'] = product.form_code.display_name or product.form_code.code
+            
+            # Route of administration
+            if product.routes_of_administration:
+                routes = [route.route_code.display_name or route.route_code.code 
+                         for route in product.routes_of_administration]
+                product_info['route_of_administration'] = ', '.join(routes)
+            
+            # Marketing information
+            if product.marketing_info:
+                product_info['marketing_status'] = product.marketing_info.status_code
+                product_info['marketing_date_start'] = self._parse_date(
+                    product.marketing_info.effective_date_low
+                )
+            
+            # Approval information
+            if product.approval_info:
+                product_info['approval_id'] = product.approval_info.approval_id
+                if product.approval_info.approval_type:
+                    product_info['approval_type'] = (
+                        product.approval_info.approval_type.display_name or 
+                        product.approval_info.approval_type.code
                     )
-                
-                # Approval information
-                if product.approval_info:
-                    product_info['approval_id'] = product.approval_info.approval_id
-                    if product.approval_info.approval_type:
-                        product_info['approval_type'] = (
-                            product.approval_info.approval_type.display_name or 
-                            product.approval_info.approval_type.code
-                        )
-                
-                break
         
         # Extract manufacturer/labeler from document author
         if document.author and document.author.organizations:

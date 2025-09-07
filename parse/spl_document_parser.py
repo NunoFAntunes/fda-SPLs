@@ -28,6 +28,7 @@ class SPLDocumentParser(BaseParser):
         self.author_parser = DocumentAuthorParser()
         self.validator = SPLDocumentValidator()
         self.section_parser = SectionParser()
+        self.document_manufactured_product = None  # Store document-level product
     
     def parse(self, source: Union[str, ET.Element]) -> SPLDocument:
         """
@@ -69,6 +70,9 @@ class SPLDocumentParser(BaseParser):
             
             # Parse document sections
             document.sections = self._parse_document_sections(root)
+            
+            # Set manufactured product at document level (extracted during section parsing)
+            document.manufactured_product = self.document_manufactured_product
             
             # Add any parsing errors to document
             document.processing_errors = [error for error in self.errors]
@@ -183,7 +187,15 @@ class SPLDocumentParser(BaseParser):
     def _parse_section(self, section_element: ET.Element) -> Optional[SPLSection]:
         """Parse a single section element using the enhanced section parser."""
         try:
-            # Use the enhanced section parser for full parsing including products and ingredients
+            # Check if this is an SPL Listing section that contains product information
+            code_element = XMLUtils.find_element(section_element, "hl7:code")
+            if code_element is not None:
+                code_value = code_element.get("code")
+                if code_value == "48780-1":  # SPL Listing section
+                    # Extract manufactured product for document level
+                    self._extract_manufactured_product_from_section(section_element)
+            
+            # Use the enhanced section parser for full parsing
             return self.section_parser.parse(section_element)
         except Exception as e:
             self.add_error(f"Enhanced section parsing failed: {str(e)}")
@@ -246,6 +258,28 @@ class SPLDocumentParser(BaseParser):
             raise ParseError(f"Failed to decode SPL file {file_path}: {str(e)}")
         except Exception as e:
             raise ParseError(f"Failed to parse SPL file {file_path}: {str(e)}")
+    
+    def _extract_manufactured_product_from_section(self, section_element: ET.Element) -> None:
+        """
+        Extract the manufactured product from an SPL Listing section element.
+        Stores the product at document level.
+        """
+        if self.document_manufactured_product is not None:
+            return  # Already found a manufactured product
+        
+        try:
+            from product_parser import ProductParser
+            
+            # Look for subject element containing manufactured product
+            subject_element = XMLUtils.find_element(section_element, "hl7:subject")
+            if subject_element is not None:
+                product_parser = ProductParser()
+                manufactured_product = product_parser.parse(subject_element)
+                if manufactured_product:
+                    self.document_manufactured_product = manufactured_product
+                    
+        except Exception as e:
+            self.add_error(f"Failed to extract manufactured product from section: {str(e)}")
 
 
 class SPLParseResult:

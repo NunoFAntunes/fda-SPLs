@@ -129,7 +129,6 @@ class SPLSection:
     section_code: Optional[CodedConcept] = None
     text_content: Optional[str] = None
     effective_time: Optional[str] = None
-    manufactured_product: Optional[ManufacturedProduct] = None
     media_references: List[MediaReference] = field(default_factory=list)
     subsections: List['SPLSection'] = field(default_factory=list)
 
@@ -158,6 +157,7 @@ class SPLDocument:
     
     # Document structure
     author: Optional[DocumentAuthor] = None
+    manufactured_product: Optional[ManufacturedProduct] = None
     sections: List[SPLSection] = field(default_factory=list)
     
     # Raw XML for reference
@@ -176,9 +176,8 @@ class SPLDocument:
     def get_manufactured_products(self) -> List[ManufacturedProduct]:
         """Extract all manufactured products from the document."""
         products = []
-        for section in self.sections:
-            if section.manufactured_product:
-                products.append(section.manufactured_product)
+        if self.manufactured_product:
+            products.append(self.manufactured_product)
         return products
     
     def get_active_ingredients(self) -> List[Ingredient]:

@@ -164,8 +164,8 @@ class SectionParser(BaseParser):
                     manufactured_product.ingredients = self._parse_product_ingredients(subject_element)
                     # print(f"[DEBUG] Found {len(manufactured_product.ingredients)} ingredients")
                     
-                    section.manufactured_product = manufactured_product
-                    # print(f"[DEBUG] Attached manufactured product to section")
+                    # Manufactured product is now handled at document level
+                    # print(f"[DEBUG] Manufactured product extracted")
                     break  # Usually only one product per section
                 else:
                     print(f"[DEBUG] Product parser returned None")
@@ -194,7 +194,7 @@ class SectionParser(BaseParser):
             manufactured_product = self.product_parser.parse(subject_element)
             if manufactured_product:
                 manufactured_product.ingredients = self._parse_product_ingredients(subject_element)
-                section.manufactured_product = manufactured_product
+                # Manufactured product is now handled at document level
                 break
         
         return section
@@ -277,8 +277,7 @@ class SectionAnalyzer:
             # Count sections with text vs product data
             if section.text_content:
                 text_sections += 1
-            if section.manufactured_product:
-                product_sections += 1
+            # Product sections are now handled at document level
         
         return {
             'total_sections': total_sections,
@@ -304,10 +303,7 @@ class SectionAnalyzer:
         # Content
         if section.text_content and len(section.text_content.strip()) > 10:
             score += 1
-        if section.manufactured_product:
-            score += 1
-        if section.title:
-            score += 1
+        # Products and titles are handled at document level
         
         return score / total_criteria
     
@@ -385,7 +381,7 @@ class SectionAnalyzer:
             'max_text_length': max(text_lengths) if text_lengths else 0,
             'min_text_length': min(text_lengths) if text_lengths else 0,
             'avg_completeness': sum(completeness_scores) / len(completeness_scores) if completeness_scores else 0,
-            'sections_with_products': sum(1 for s in sections if s.manufactured_product),
+            'sections_with_products': 0,  # Products now handled at document level
             'sections_with_media': sum(1 for s in sections if s.media_references),
             'total_subsections': sum(len(s.subsections) for s in sections)
         }

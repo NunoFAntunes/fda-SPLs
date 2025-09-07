@@ -41,18 +41,15 @@ class IngredientMapper(BaseMapper):
         """Extract all ingredients from document sections."""
         ingredients = []
         
-        # Look for SPL Listing sections (LOINC 48780-1) with manufactured products
-        for section in document.sections:
-            if (section.section_code and section.section_code.code == "48780-1" and 
-                section.manufactured_product is not None):
-                
-                product = section.manufactured_product
-                
-                # Process all ingredients in this product
-                for ingredient in product.ingredients:
-                    ingredient_data = self._map_ingredient_to_db(document.document_id, ingredient)
-                    if ingredient_data:
-                        ingredients.append(ingredient_data)
+        # Use document-level manufactured product
+        if document.manufactured_product is not None:
+            product = document.manufactured_product
+            
+            # Process all ingredients in this product
+            for ingredient in product.ingredients:
+                ingredient_data = self._map_ingredient_to_db(document.document_id, ingredient)
+                if ingredient_data:
+                    ingredients.append(ingredient_data)
         
         return ingredients
     

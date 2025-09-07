@@ -88,12 +88,19 @@ class ProductParser(BaseParser):
         if name_element is None:
             return None, None
         
-        # Extract main name text
-        name_text = XMLUtils.get_text_content(name_element)
-        
         # Extract suffix if present
         suffix_element = XMLUtils.find_element(name_element, "hl7:suffix")
         suffix_text = XMLUtils.get_text_content(suffix_element) if suffix_element else None
+        
+        # Extract main name text (excluding suffix content)
+        if name_element.text:
+            name_text = name_element.text.strip()
+        else:
+            # Fallback to full text content if no direct text
+            name_text = XMLUtils.get_text_content(name_element)
+            # If we have a suffix, try to remove it from the full text
+            if suffix_text and name_text and suffix_text in name_text:
+                name_text = name_text.replace(suffix_text, '').strip()
         
         return name_text, suffix_text
     

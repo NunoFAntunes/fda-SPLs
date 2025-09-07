@@ -231,11 +231,7 @@ class SPLSectionValidator(BaseValidator):
             result.errors.extend(coded_result.errors)
             result.warnings.extend(coded_result.warnings)
         
-        if section.manufactured_product:
-            product_validator = ManufacturedProductValidator()
-            product_result = product_validator.validate(section.manufactured_product, f"{context}.manufactured_product")
-            result.errors.extend(product_result.errors)
-            result.warnings.extend(product_result.warnings)
+        # Manufactured product validation is now handled at document level
         
         # Validate subsections recursively
         for i, subsection in enumerate(section.subsections):
