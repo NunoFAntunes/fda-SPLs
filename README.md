@@ -1,19 +1,46 @@
-FDA Structured Product Label (SPL) Summarization & Extraction
-📌 Overview
+# FDA Structured Product Label (SPL) Summarization & Extraction
 
-This project demonstrates how to build a GenAI + NLP pipeline for healthcare documents using the FDA Structured Product Labels (SPLs) dataset from DailyMed
-.
+## Overview
 
-The pipeline ingests SPL XML files, extracts and normalizes structured data (e.g., drug names, NDCs, manufacturer info, indications, dosage, warnings), and uses Large Language Models (LLMs) to generate patient-friendly summaries at multiple reading levels.
+This project creates an LLM-powered system to answer questions about medication using the FDA Structured Product Labels (SPLs) dataset from DailyMed. The dataset consists of XML files containing comprehensive medication information, including both structured fields (medication names, ingredients, NDCs) and unstructured content (contraindications, precautions, warnings).
 
-This project is designed to showcase skills relevant to GenAI/LLM roles in the healthcare sector:
+**Example data:** See `example.xml` in the project root for a sample SPL file.
 
-Document ingestion & parsing
+## Project Goals
 
-Information extraction
+This project demonstrates how to build a GenAI + NLP pipeline for healthcare documents, showcasing skills relevant to GenAI/LLM roles in the healthcare sector:
 
-Summarization & simplification
+- **Document ingestion & parsing** - Processing XML SPL files
+- **Information extraction** - Extracting structured and unstructured data
+- **Data normalization** - Standardizing medication information
+- **Summarization & simplification** - Generating patient-friendly content
+- **Building structured knowledge APIs** - Creating queryable interfaces
+- **Search & retrieval** - Implementing hybrid search capabilities
 
-Building structured knowledge APIs
+## Architecture & Data Strategy
 
-Search & retrieval (optional)
+### Data Types and Storage Approach
+
+**Structured Data** (NDC codes, active ingredients, dosage forms, manufacturer info, colors, imprints)
+- Requirements: Precise queryability (e.g., "Show me all tablets with polythiazide")
+- Solution: Relational database (PostgreSQL)
+
+**Unstructured Data** (indications, contraindications, warnings, precautions, adverse reactions)
+- Requirements: Semantic search and contextual retrieval
+- Solution: Vector database with embeddings (RAG)
+
+**Lexical/Keyword Search** (drug codes, imprint codes, ingredient names)
+- Requirements: Exact text matching for regulatory data
+- Solution: Elasticsearch/OpenSearch for flexible keyword indexing
+
+### Hybrid Solution
+
+**RAG + Relational DB + Elasticsearch**
+
+This three-tier approach provides:
+- **Precision**: Structured SQL queries for exact data retrieval
+- **Semantic Context**: RAG for understanding complex medical queries
+- **Robust Keyword Lookup**: Elasticsearch for regulatory code searches
+
+*Why not RAG alone?* LLMs can hallucinate without structured data validation.
+*Why not just RAG + DB?* Missing flexible keyword search critical for medical lookups.

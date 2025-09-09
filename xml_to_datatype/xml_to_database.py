@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 
 from spl_xml_to_dataclass import SPLXMLToDataclassConverter
+from spl_data_cleaner import create_spl_cleaner
 from spl_data_types import (
     SPLDocument, ManufacturedProduct, Ingredient, IngredientSubstance,
     ActiveMoiety, Packaging, Approval, MarketingAct, Characteristic,
@@ -44,10 +45,19 @@ class DatabaseConfig:
 class SPLDatabaseInserter:
     """Handles insertion of SPL data into PostgreSQL database."""
     
-    def __init__(self, db_config: DatabaseConfig):
+    def __init__(self, db_config: DatabaseConfig, enable_cleaning: bool = True, json_output_dir: Optional[str] = None):
         self.db_config = db_config
         self.connection: Optional[Connection] = None
         self.logger = logging.getLogger(__name__)
+        self.enable_cleaning = enable_cleaning
+        self.json_output_dir = Path(json_output_dir) if json_output_dir else None
+        
+        # Initialize data cleaner if cleaning is enabled
+        self.data_cleaner = create_spl_cleaner() if enable_cleaning else None
+        
+        # Ensure JSON output directory exists if specified
+        if self.json_output_dir:
+            self.json_output_dir.mkdir(parents=True, exist_ok=True)
     
     def connect(self) -> bool:
         """Establish database connection."""
@@ -68,12 +78,21 @@ class SPLDatabaseInserter:
             self.logger.info("Disconnected from database")
     
     def insert_spl_document(self, spl_doc: SPLDocument) -> bool:
-        """Insert complete SPL document into database."""
+        """Insert complete SPL document into database with optional cleaning and JSON export."""
         if not self.connection:
             self.logger.error("No database connection")
             return False
         
         try:
+            # Apply data cleaning pipeline if enabled
+            if self.enable_cleaning and self.data_cleaner:
+                self.logger.debug(f"Applying data cleaning pipeline to document: {spl_doc.document.id.root}")
+                spl_doc = self.data_cleaner.clean_spl_document(spl_doc)
+            
+            # Save JSON if output directory specified
+            if self.json_output_dir:
+                self._save_json(spl_doc)
+            
             cursor = self.connection.cursor(cursor_factory=RealDictCursor)
             
             # Start transaction
@@ -500,11 +519,34 @@ class SPLDatabaseInserter:
         """, (
             doc_id, media.ID, media.text, media_type, media_reference
         ))
+    
+    def _save_json(self, spl_doc: SPLDocument):
+        """Save SPL document as JSON file."""
+        if not self.json_output_dir:
+            return
+        
+        try:
+            # Generate JSON filename based on document ID
+            doc_id = spl_doc.document.id.root if spl_doc.document and spl_doc.document.id else "unknown"
+            json_filename = f"{doc_id}.json"
+            json_path = self.json_output_dir / json_filename
+            
+            # Convert to JSON
+            json_content = spl_doc.to_json(indent=2)
+            
+            # Write JSON file
+            with open(json_path, 'w', encoding='utf-8') as f:
+                f.write(json_content)
+            
+            self.logger.debug(f"Saved JSON: {json_path}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to save JSON for document {spl_doc.document.id.root}: {e}")
 
 
 def main():
     """Main function to handle command line arguments and run conversion."""
-    parser = argparse.ArgumentParser(description='Convert FDA SPL XML to database')
+    parser = argparse.ArgumentParser(description='Convert FDA SPL XML to database with optional cleaning and JSON export')
     parser.add_argument('xml_file', help='Input XML file path')
     parser.add_argument('--host', default='localhost', help='Database host (default: localhost)')
     parser.add_argument('--port', type=int, default=5432, help='Database port (default: 5432)')
@@ -512,11 +554,16 @@ def main():
     parser.add_argument('--user', default='postgres', help='Database user (default: postgres)')
     parser.add_argument('--password', default='postgres', help='Database password (default: postgres)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--no-cleaning', action='store_true', 
+                       help='Disable data cleaning pipeline (faster but less normalized data)')
+    parser.add_argument('--json-output', help='Directory to save JSON files (optional)')
+    parser.add_argument('--cleaning-only', action='store_true',
+                       help='Enable detailed cleaning logs for debugging')
     
     args = parser.parse_args()
     
     # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
+    log_level = logging.DEBUG if (args.verbose or args.cleaning_only) else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(levelname)s - %(message)s'
@@ -544,8 +591,15 @@ def main():
             password=args.password
         )
         
-        # Insert into database
-        inserter = SPLDatabaseInserter(db_config)
+        # Setup database inserter with cleaning and JSON export options
+        enable_cleaning = not args.no_cleaning
+        cleaning_status = "enabled" if enable_cleaning else "disabled"
+        logger.info(f"Data cleaning pipeline: {cleaning_status}")
+        
+        if args.json_output:
+            logger.info(f"JSON files will be saved to: {args.json_output}")
+        
+        inserter = SPLDatabaseInserter(db_config, enable_cleaning, args.json_output)
         if not inserter.connect():
             logger.error("Failed to connect to database")
             sys.exit(1)

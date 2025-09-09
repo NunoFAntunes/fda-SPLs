@@ -20,6 +20,7 @@ import json
 
 from xml_to_database import SPLDatabaseInserter, DatabaseConfig
 from spl_xml_to_dataclass import SPLXMLToDataclassConverter
+from spl_data_cleaner import create_spl_cleaner
 
 
 class BatchProcessingStats:
@@ -83,14 +84,24 @@ class BatchXMLProcessor:
     """Processes XML files in batches with multiprocessing support."""
     
     def __init__(self, db_config: DatabaseConfig, max_workers: int = 4, 
-                 skip_duplicates: bool = True, continue_on_error: bool = True):
+                 skip_duplicates: bool = True, continue_on_error: bool = True,
+                 enable_cleaning: bool = True, json_output_dir: Optional[str] = None):
         self.db_config = db_config
         self.max_workers = max_workers
         self.skip_duplicates = skip_duplicates
         self.continue_on_error = continue_on_error
+        self.enable_cleaning = enable_cleaning
+        self.json_output_dir = Path(json_output_dir) if json_output_dir else None
         self.stats = BatchProcessingStats()
         self.logger = logging.getLogger(__name__)
         self.processed_documents: set = set()
+        
+        # Initialize data cleaner if cleaning is enabled
+        self.data_cleaner = create_spl_cleaner() if enable_cleaning else None
+        
+        # Ensure JSON output directory exists if specified
+        if self.json_output_dir:
+            self.json_output_dir.mkdir(parents=True, exist_ok=True)
         
     def find_xml_files(self, folder_path: Path) -> List[Path]:
         """Find all XML files in the folder structure."""
@@ -111,7 +122,7 @@ class BatchXMLProcessor:
             return False
             
         try:
-            inserter = SPLDatabaseInserter(self.db_config)
+            inserter = SPLDatabaseInserter(self.db_config, enable_cleaning=False)  # No cleaning for duplicate check
             if not inserter.connect():
                 return False
             
@@ -159,8 +170,17 @@ class BatchXMLProcessor:
                 self.logger.debug(f"Skipping duplicate document: {spl_document.document.id.root}")
                 return result
             
+            # Apply data cleaning pipeline if enabled
+            if self.enable_cleaning and self.data_cleaner:
+                self.logger.debug(f"Applying data cleaning pipeline to: {xml_file}")
+                spl_document = self.data_cleaner.clean_spl_document(spl_document)
+            
+            # Save JSON if output directory specified
+            if self.json_output_dir:
+                self._save_json(spl_document, xml_file)
+            
             # Insert into database
-            inserter = SPLDatabaseInserter(self.db_config)
+            inserter = SPLDatabaseInserter(self.db_config, enable_cleaning=False, json_output_dir=None)  # Cleaning already done
             if not inserter.connect():
                 raise Exception("Failed to connect to database")
             
@@ -189,6 +209,28 @@ class BatchXMLProcessor:
             self.stats.increment_processed()
         
         return result
+    
+    def _save_json(self, spl_doc, xml_file: Path):
+        """Save SPL document as JSON file."""
+        if not self.json_output_dir:
+            return
+        
+        try:
+            # Generate JSON filename based on original XML filename
+            json_filename = xml_file.stem + '.json'
+            json_path = self.json_output_dir / json_filename
+            
+            # Convert to JSON
+            json_content = spl_doc.to_json(indent=2)
+            
+            # Write JSON file
+            with open(json_path, 'w', encoding='utf-8') as f:
+                f.write(json_content)
+            
+            self.logger.debug(f"Saved JSON: {json_path}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to save JSON for {xml_file}: {e}")
     
     def process_files_sequential(self, xml_files: List[Path]) -> List[Dict[str, Any]]:
         """Process files sequentially (single-threaded)."""
@@ -314,7 +356,7 @@ class BatchXMLProcessor:
 
 def main():
     """Main function to handle command line arguments and run batch processing."""
-    parser = argparse.ArgumentParser(description='Batch process FDA SPL XML files to database')
+    parser = argparse.ArgumentParser(description='Batch process FDA SPL XML files to database with enhanced cleaning and JSON export')
     parser.add_argument('folder', help='Input folder path containing XML files')
     parser.add_argument('--host', default='localhost', help='Database host (default: localhost)')
     parser.add_argument('--port', type=int, default=5432, help='Database port (default: 5432)')
@@ -326,11 +368,16 @@ def main():
     parser.add_argument('--stop-on-error', action='store_true', help='Stop processing on first error (default: continue)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     parser.add_argument('--report', help='Save processing report to JSON file')
+    parser.add_argument('--no-cleaning', action='store_true', 
+                       help='Disable data cleaning pipeline (faster but less normalized data)')
+    parser.add_argument('--json-output', help='Directory to save JSON files (optional)')
+    parser.add_argument('--cleaning-only', action='store_true',
+                       help='Enable detailed cleaning logs for debugging')
     
     args = parser.parse_args()
     
     # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
+    log_level = logging.DEBUG if (args.verbose or args.cleaning_only) else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -363,19 +410,29 @@ def main():
         
         # Test database connection
         logger.info("Testing database connection...")
-        inserter = SPLDatabaseInserter(db_config)
+        inserter = SPLDatabaseInserter(db_config, enable_cleaning=False)
         if not inserter.connect():
             logger.error("Failed to connect to database")
             sys.exit(1)
         inserter.disconnect()
         logger.info("Database connection successful")
         
+        # Setup enhanced processing options
+        enable_cleaning = not args.no_cleaning
+        cleaning_status = "enabled" if enable_cleaning else "disabled"
+        logger.info(f"Data cleaning pipeline: {cleaning_status}")
+        
+        if args.json_output:
+            logger.info(f"JSON files will be saved to: {args.json_output}")
+        
         # Setup batch processor
         processor = BatchXMLProcessor(
             db_config=db_config,
             max_workers=args.workers,
             skip_duplicates=not args.no_skip_duplicates,
-            continue_on_error=not args.stop_on_error
+            continue_on_error=not args.stop_on_error,
+            enable_cleaning=enable_cleaning,
+            json_output_dir=args.json_output
         )
         
         # Process folder
