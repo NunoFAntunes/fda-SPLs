@@ -1,0 +1,31 @@
+{
+  "total_chunks": 32521,
+  "total_documents": 3232,
+  "total_words": 2632449,
+  "avg_words_per_chunk": 80.9461271178623,
+  "section_type_distribution": {
+    "PRECAUTIONS": 1459,
+    "INDICATIONS AND USAGE": 1874,
+    "PRODUCT_INFO": 3238,
+    "OTHER": 17977,
+    "DESCRIPTION": 1294,
+    "DOSAGE AND ADMINISTRATION": 2119,
+    "ADVERSE REACTIONS": 704,
+    "STORAGE AND HANDLING": 1703,
+    "CONTRAINDICATIONS": 589,
+    "CLINICAL PHARMACOLOGY": 421,
+    "WARNINGS AND PRECAUTIONS": 715,
+    "USER SAFETY WARNINGS": 231,
+    "OTC - ASK DOCTOR": 16,
+    "OTC - DO NOT USE": 67,
+    "OTC - STOP USE": 32,
+    "OTC - WHEN USING THIS PRODUCT": 26,
+    "OVERDOSAGE": 53,
+    "INTENDED USE OF THE DEVICE": 3
+  },
+  "chunks_per_document": {
+    "min": 1,
+    "max": 62,
+    "avg": 10.062190594059405
+  }
+}
