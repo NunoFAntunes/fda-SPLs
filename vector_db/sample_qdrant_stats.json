@@ -1,0 +1,19 @@
+{
+  "total_documents": 10,
+  "documents_with_ndc": 10,
+  "documents_with_generic_name": 0,
+  "documents_with_dosage_form": 10,
+  "documents_with_route": 10,
+  "section_type_distribution": {
+    "PRECAUTIONS": 1,
+    "INDICATIONS AND USAGE": 1,
+    "PRODUCT_INFO": 1,
+    "OTHER": 6,
+    "DESCRIPTION": 1
+  },
+  "manufacturer_distribution": {
+    "Durvet, Inc.": 7,
+    "BouMatic, LLC": 3
+  },
+  "avg_word_count": 73.2
+}

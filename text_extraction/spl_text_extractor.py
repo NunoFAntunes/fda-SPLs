@@ -11,6 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 import logging
 
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
+    print("Warning: tiktoken not installed. Install with: pip install tiktoken")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -69,14 +75,33 @@ class SPLTextExtractor:
         '60560-0': 'INTENDED USE OF THE DEVICE'
     }
     
-    def __init__(self, max_chunk_size: int = 500):
+    def __init__(self, max_chunk_tokens: int = 1000, overlap_tokens: int = 150, embedding_model: str = "text-embedding-3-small"):
         """
         Initialize the text extractor.
         
         Args:
-            max_chunk_size: Maximum number of words per chunk for embeddings
+            max_chunk_tokens: Maximum number of tokens per chunk for embeddings
+            overlap_tokens: Number of tokens to overlap between adjacent chunks
+            embedding_model: OpenAI embedding model name (for tokenizer selection)
         """
-        self.max_chunk_size = max_chunk_size
+        self.max_chunk_tokens = max_chunk_tokens
+        self.overlap_tokens = min(overlap_tokens, max_chunk_tokens // 4)  # Ensure overlap is reasonable
+        self.embedding_model = embedding_model
+        
+        # Initialize tokenizer
+        if tiktoken is not None:
+            try:
+                self.tokenizer = tiktoken.encoding_for_model(embedding_model)
+                logger.info(f"Using tiktoken tokenizer for {embedding_model}")
+            except KeyError:
+                # Fallback to cl100k_base encoding (used by text-embedding-3-* models)
+                self.tokenizer = tiktoken.get_encoding("cl100k_base")
+                logger.info(f"Using cl100k_base tokenizer (fallback for {embedding_model})")
+        else:
+            self.tokenizer = None
+            logger.warning("tiktoken not available, falling back to word-based chunking")
+        
+        logger.info(f"Chunking config: max_tokens={self.max_chunk_tokens}, overlap_tokens={self.overlap_tokens}")
     
     def extract_document_metadata(self, spl_data: Dict) -> Dict[str, str]:
         """Extract key metadata from the SPL document"""
@@ -111,50 +136,130 @@ class SPLTextExtractor:
     
     def chunk_text(self, text: str, section_type: str) -> List[str]:
         """
-        Split text into chunks suitable for embeddings.
+        Split text into overlapping chunks suitable for embeddings using token-based chunking.
         
         Args:
             text: The text to chunk
             section_type: Type of section for context-aware chunking
             
         Returns:
-            List of text chunks
+            List of overlapping text chunks
         """
         if not text or not text.strip():
             return []
         
-        words = text.split()
-        if len(words) <= self.max_chunk_size:
+        # If no tokenizer available, fallback to word-based chunking
+        if self.tokenizer is None:
+            return self._chunk_text_by_words(text)
+        
+        # Token-based chunking with overlap
+        tokens = self.tokenizer.encode(text)
+        
+        if len(tokens) <= self.max_chunk_tokens:
             return [text]
         
         chunks = []
-        current_chunk = []
+        start_idx = 0
         
-        for word in words:
-            current_chunk.append(word)
+        while start_idx < len(tokens):
+            # Calculate end index for this chunk
+            end_idx = min(start_idx + self.max_chunk_tokens, len(tokens))
+            chunk_tokens = tokens[start_idx:end_idx]
             
-            # Check if we should end this chunk
-            if len(current_chunk) >= self.max_chunk_size:
-                # Try to end at sentence boundary
-                chunk_text = ' '.join(current_chunk)
-                if '.' in chunk_text[-50:]:  # Look for sentence end in last 50 chars
-                    last_period = chunk_text.rfind('.')
-                    if last_period > len(chunk_text) - 50:
-                        # Split at the sentence boundary
-                        chunks.append(chunk_text[:last_period + 1].strip())
-                        remaining_words = chunk_text[last_period + 1:].strip().split()
-                        current_chunk = [w for w in remaining_words if w]
-                        continue
+            # Decode chunk
+            chunk_text = self.tokenizer.decode(chunk_tokens).strip()
+            
+            # Try to end at sentence boundary if not at the very end
+            if end_idx < len(tokens):
+                chunk_text = self._adjust_chunk_boundary(chunk_text, forward=True)
+            
+            if chunk_text:
+                chunks.append(chunk_text)
+            
+            # Move start index forward, accounting for overlap
+            # If this is the last chunk, break
+            if end_idx >= len(tokens):
+                break
                 
-                # No good sentence boundary, just split at word boundary
+            # Calculate next start position with overlap
+            next_start = start_idx + self.max_chunk_tokens - self.overlap_tokens
+            start_idx = max(next_start, start_idx + 1)  # Ensure we always make progress
+        
+        return [chunk for chunk in chunks if chunk.strip()]
+    
+    def _adjust_chunk_boundary(self, chunk_text: str, forward: bool = True) -> str:
+        """
+        Adjust chunk boundary to end at a sentence when possible.
+        
+        Args:
+            chunk_text: The chunk text to adjust
+            forward: If True, try to extend to complete sentence; if False, try to cut at sentence
+            
+        Returns:
+            Adjusted chunk text
+        """
+        if not chunk_text:
+            return chunk_text
+            
+        # Look for sentence endings in the last portion of the chunk
+        import re
+        sentence_endings = re.findall(r'[.!?]+(?=\s|$)', chunk_text)
+        
+        if sentence_endings:
+            # Find the last sentence ending
+            last_ending_match = None
+            for match in re.finditer(r'[.!?]+(?=\s|$)', chunk_text):
+                last_ending_match = match
+            
+            if last_ending_match and last_ending_match.end() > len(chunk_text) * 0.7:
+                # If sentence ending is in the last 30% of chunk, cut there
+                return chunk_text[:last_ending_match.end()].strip()
+        
+        return chunk_text
+    
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """Split text into sentences for better chunking boundaries."""
+        import re
+        # Simple sentence splitting on periods, exclamation marks, and question marks
+        # followed by whitespace or end of string
+        sentences = re.split(r'[.!?]+(?=\s|$)', text)
+        return [s.strip() for s in sentences if s.strip()]
+    
+    def _chunk_text_by_words(self, text: str) -> List[str]:
+        """Fallback word-based chunking with overlap when tokenizer is not available."""
+        words = text.split()
+        # Convert token limits to approximate word limits (roughly 1.3 tokens per word)
+        max_words = int(self.max_chunk_tokens / 1.3)
+        overlap_words = int(self.overlap_tokens / 1.3)
+        
+        if len(words) <= max_words:
+            return [text]
+        
+        chunks = []
+        start_idx = 0
+        
+        while start_idx < len(words):
+            # Calculate end index for this chunk
+            end_idx = min(start_idx + max_words, len(words))
+            chunk_words = words[start_idx:end_idx]
+            chunk_text = ' '.join(chunk_words)
+            
+            # Try to end at sentence boundary if not at the very end
+            if end_idx < len(words):
+                chunk_text = self._adjust_chunk_boundary(chunk_text, forward=True)
+            
+            if chunk_text.strip():
                 chunks.append(chunk_text.strip())
-                current_chunk = []
+            
+            # Move start index forward, accounting for overlap
+            if end_idx >= len(words):
+                break
+                
+            # Calculate next start position with overlap
+            next_start = start_idx + max_words - overlap_words
+            start_idx = max(next_start, start_idx + 1)  # Ensure we always make progress
         
-        # Add remaining words
-        if current_chunk:
-            chunks.append(' '.join(current_chunk).strip())
-        
-        return chunks
+        return [chunk for chunk in chunks if chunk.strip()]
     
     def extract_text_chunks(self, json_file_path: str) -> List[TextChunk]:
         """
@@ -352,8 +457,12 @@ def main():
     parser = argparse.ArgumentParser(description='Extract text from SPL JSON files for embeddings')
     parser.add_argument('input_dir', help='Directory containing JSON files')
     parser.add_argument('output_dir', help='Directory to save extracted chunks')
-    parser.add_argument('--chunk-size', type=int, default=500, 
-                       help='Maximum words per chunk (default: 500)')
+    parser.add_argument('--chunk-tokens', type=int, default=1000, 
+                       help='Maximum tokens per chunk (default: 1000)')
+    parser.add_argument('--overlap-tokens', type=int, default=150,
+                       help='Number of tokens to overlap between chunks (default: 150)')
+    parser.add_argument('--embedding-model', type=str, default='text-embedding-3-small',
+                       help='OpenAI embedding model name (default: text-embedding-3-small)')
     parser.add_argument('--verbose', '-v', action='store_true', 
                        help='Enable verbose logging')
     
@@ -362,7 +471,11 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    extractor = SPLTextExtractor(max_chunk_size=args.chunk_size)
+    extractor = SPLTextExtractor(
+        max_chunk_tokens=args.chunk_tokens, 
+        overlap_tokens=args.overlap_tokens,
+        embedding_model=args.embedding_model
+    )
     extractor.process_directory(args.input_dir, args.output_dir)
 
 
